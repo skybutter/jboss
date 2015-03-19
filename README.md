@@ -1,2 +1,2 @@
 # jboss
-JBoss AS 7 and EAP 6 Configuration Setup Example
+JBoss AS 7 and EAP 6 Domain cluster configuration Setup Example
