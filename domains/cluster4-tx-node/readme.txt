@@ -12,3 +12,4 @@ This sample contains a working copy of JBoss Domain cluster configuration.
 9.  Use Unicast for jgroups.  Default is multicast.
 10. Same as cluster4, but with Jboss transaction subsystem node specified. Asked by RedHat Support Staff to troubleshoot database transaction problem.
 11. Increase transaction timed out from 300 to 900 seconds.
+12. Management Realm user "admin" is added to access Management Console

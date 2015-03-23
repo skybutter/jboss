@@ -6,4 +6,4 @@ This sample contains a working copy of JBoss Domain cluster configuration.
 5.  Properties are specified in host1.properties.
 6.  host1.xml is used for the JBoss host.  host-master and host-slave are removed.
 7.  JBoss Profile full-ha is used.
-
+8.  Management Realm user "admin" is added to access Management Console

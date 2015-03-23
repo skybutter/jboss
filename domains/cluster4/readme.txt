@@ -10,4 +10,4 @@ This sample contains a working copy of JBoss Domain cluster configuration.
 7.  host*.xml is used for each JBoss host.  Default host-master and host-slave from installation are removed.
 8.  JBoss Profile full-ha is used.
 9.  Use Unicast for jgroups.  Default is multicast.
-
+10. Management Realm user "admin" is added to access Management Console

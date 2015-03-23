@@ -13,3 +13,4 @@ This sample contains a working copy of JBoss Domain cluster configuration.
 10. Same as cluster4, but with Jboss transaction subsystem node specified. Asked by RedHat Support Staff to troubleshoot database transaction problem.
 11. Encrypt password in domain.xml using secure vault.  The jms user password is encrypted and stored in ./vault directory
 12. Need setup vault instruction in Wiki.
+13. Management Realm user "admin" is added to access Management Console
