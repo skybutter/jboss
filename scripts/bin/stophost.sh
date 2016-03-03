@@ -99,5 +99,6 @@ else
 fi
 echo "Cleaning up files for JBoss ${JBOSS_HOST} server ${SERVER0} ${SERVER1} ..."
 rm -rf ${DOMAIN_DIR}/servers/${SERVER_NAME}${SERVER0}/tmp ${DOMAIN_DIR}/servers/${SERVER_NAME}${SERVER1}/tmp
+rm -rf ${DOMAIN_DIR}/servers/${SERVER_NAME}${SERVER0}/data/content ${DOMAIN_DIR}/servers/${SERVER_NAME}${SERVER1}/data/content
 echo "Finished Cleaning up files for JBoss ${JBOSS_HOST} server ${SERVER0} ${SERVER1} ..."
 

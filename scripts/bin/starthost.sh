@@ -86,6 +86,7 @@ waitForStart()
   logfile=$JBOSS_CONSOLE_LOG
   num=`/usr/bin/wc -l $logfile|/usr/bin/cut -d/ -f1|/usr/bin/tr -d " " `
   count=0
+  counthost=0
   while (true)
      do
         printf ".";
@@ -109,7 +110,7 @@ waitForStart()
                 echo "Server started with errors."
                 exit 6
         fi
-        if /usr/bin/tail -n +$num $logfile | grep -E "JBAS010344: Failed to start "
+        if /usr/bin/tail -n +$num $logfile | grep -E "JBAS010344: Failed to start jboss.atp.singleton.timer.service"
            then
                 printf "\n";
                 echo "Server started with errors."
@@ -121,6 +122,14 @@ waitForStart()
            exit 0
         else
            sleep 1
+        fi
+        lastline=$(/usr/bin/tail -n 2 $logfile |grep '(Controller Boot Thread) JBAS015874:')
+        if ! [ -z "${lastline}" ]; then
+          counthost=`expr $counthost + 1`
+          if [ $counthost -gt 10 ];  then
+            echo "Host Controller started.  But no server set to autostart."
+            exit 0;
+          fi
         fi
         if [ $count -eq 10 ];  then
            if /usr/bin/tail -n 4 $logfile |grep '(Controller Boot Thread) JBAS015874:'

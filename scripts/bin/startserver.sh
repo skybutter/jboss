@@ -105,7 +105,7 @@ waitForStart()
                 echo "Server started with errors."
                 exit 6
         fi
-        if /usr/bin/tail -n +$num $logfile | grep -E "JBAS010344: Failed to start "
+        if /usr/bin/tail -n +$num $logfile | grep -E "JBAS010344: Failed to start jboss.atp.singleton.timer.service"
            then
                 printf "\n";
                 echo "Server started with errors."
