@@ -1,0 +1,293 @@
+https://access.redhat.com/site/documentation/en-US/JBoss_Enterprise_Application_Platform/6.2/html-single/Security_Guide/
+
+**********************************************************************************************
+**********************************************************************************************
+This document show the steps to use Vault in JBoss EAP 6.x to store password.
+This is to avoid having clear text password in configuration files.
+This document only store one password (database password) in the vault.  
+You can store as many password as your want in the vault.
+**********************************************************************************************
+**********************************************************************************************
+JAVA_HOME=/var/jdk1.7.0_51
+DOMAIN_DIR=/<your-path>/<your-domain>
+JBOSS_HOME=/<your-path-jboss>/jboss-eap-6.2
+
+cd ${DOMAIN_DIR}
+mkdir vault
+${JAVA_HOME}/bin/keytool -genseckey -alias vault -storetype jceks -keyalg AES -keysize 128 -storepass [store-password] -keypass [key-password] -keystore ${DOMAIN_DIR}/vault/vault.keystore
+${JBOSS_HOME}/bin/vault.sh
+=========================================================================
+
+  JBoss Vault
+
+  JBOSS_HOME: /<your-path-jboss>/jboss-eap-6.2
+
+  JAVA: /var/jdk1.7.0_51/bin/java
+
+=========================================================================
+
+**********************************
+****  JBoss Vault  ***************
+**********************************
+Please enter a Digit::   0: Start Interactive Session  1: Remove Interactive Session  2: Exit
+0
+Starting an interactive session
+Enter directory to store encrypted files:<your-DOMAIN_DIR>/vault/
+Enter Keystore URL:<your-DOMAIN_DIR>/vault/vault.keystore
+Enter Keystore password:[key-password]
+Enter Keystore password again:[key-password]
+Values match
+Enter 8 character salt:[your-8-character-salt]
+Enter iteration count as a number (Eg: 44):99
+Enter Keystore Alias:vault
+Initializing Vault
+Apr 14, 2014 1:55:37 PM org.picketbox.plugins.vault.PicketBoxSecurityVault init
+INFO: PBOX000361: Default Security Vault Implementation Initialized and Ready
+Vault Configuration in AS7 config file:
+********************************************
+...
+</extensions>
+<vault>
+  <vault-option name="KEYSTORE_URL" value="<your-DOMAIN_DIR>/vault/vault.keystore"/>
+  <vault-option name="KEYSTORE_PASSWORD" value="[based on key-password]"/>
+  <vault-option name="KEYSTORE_ALIAS" value="vault"/>
+  <vault-option name="SALT" value="[your-8-character-salt]"/>
+  <vault-option name="ITERATION_COUNT" value="99"/>
+  <vault-option name="ENC_FILE_DIR" value="<your-DOMAIN_DIR>/vault/"/>
+</vault><management> ...
+********************************************
+Vault is initialized and ready for use
+Handshake with Vault complete
+Please enter a Digit::   0: Store a secured attribute  1: Check whether a secured attribute exists  2: Exit
+0
+Task: Store a secured attribute
+Please enter secured attribute value (such as password):<your-database-password>
+Please enter secured attribute value (such as password) again:<your-database-password>
+Values match
+Enter Vault Block:<your-data-source-name>
+Enter Attribute Name:password
+Secured attribute value has been stored in vault.
+Please make note of the following:
+********************************************
+Vault Block:<your-data-source-name>
+Attribute Name:password
+Configuration should be done as follows:
+VAULT::<your-data-source-name>::password::1
+********************************************
+Please enter a Digit::   0: Store a secured attribute  1: Check whether a secured attribute exists  2: Exit
+2
+
+Record the vault section of the screen output, starting with <vault>...
+Record the value of KEYSTORE_PASSWORD, used in the xml
+Record the value of salt, used later in the xml
+
+Modify the vault XML tag:
+<vault>
+    <vault-option name="KEYSTORE_URL" value="${jboss.domain.base.dir}/vault/vault.keystore"/>
+<vault-option name="KEYSTORE_PASSWORD" value="[based on key-password]"/>
+<vault-option name="KEYSTORE_ALIAS" value="vault"/>
+<vault-option name="SALT" value="[your-8-character-salt]"/>
+<vault-option name="ITERATION_COUNT" value="99"/>
+<vault-option name="ENC_FILE_DIR" value="${jboss.domain.base.dir}/vault/"/>
+</vault>
+
+Note: You only need to put ${jboss.domain.base.dir} in if you use the variable substitutions in your jboss configurations.
+
+#######################################################################
+Modify domain.xml
+Find the datasources section, modify the password to the VAULT string
+#######################################################################
+            <subsystem xmlns="urn:jboss:domain:datasources:1.2">
+                <datasources>
+                    <datasource jndi-name="java:jboss/datasources/<your-data-source-name>" pool-name="<your-data-source-name>" enabled="true" use-java-context="true" use-ccm="true" statistics-enabled="true">
+                        <connection-url>...</connection-url>
+						...
+                        <security>
+                            <user-name><your-db-user></user-name>
+                            <password>${VAULT::<your-data-source-name>::password::1}</password>
+                        </security>
+						...
+						
+Save the domain.xml file
+
+#######################################################################
+Modify all the host*.xml
+Under the <host>, put the vault xml section in
+#######################################################################
+<host name="host1" xmlns="urn:jboss:domain:1.5">
+    <vault>
+        <vault-option name="KEYSTORE_URL" value="${jboss.domain.base.dir}/vault/vault.keystore"/>
+        <vault-option name="KEYSTORE_PASSWORD" value="[based on key-password]"/>
+        <vault-option name="KEYSTORE_ALIAS" value="vault"/>
+        <vault-option name="SALT" value="[your-8-character-salt]"/>
+        <vault-option name="ITERATION_COUNT" value="99"/>
+        <vault-option name="ENC_FILE_DIR" value="${jboss.domain.base.dir}/vault/"/>
+    </vault>
+    <management>...
+
+Save the host*.xml files
+Your vault configuration is ready to use.
+Start JBoss to verify.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+cd ../dev01
+mkdir vault
+$JAVA_HOME/bin/keytool -genseckey -alias vault -storetype jceks -keyalg AES -keysize 128 -storepass western1 -keypass western1 -keystore ~/domains/dev01/vault/vault.keystore
+atp@atpappdev1: /opt/projects/trading/atp/jboss-eap-6.2/bin/vault.sh
+=========================================================================
+
+  JBoss Vault
+
+  JBOSS_HOME: /opt/projects/trading/atp/jboss-eap-6.2
+
+  JAVA: /usr/jdk/jdk1.7.0_51/bin/java
+
+=========================================================================
+
+**********************************
+****  JBoss Vault  ***************
+**********************************
+Please enter a Digit::   0: Start Interactive Session  1: Remove Interactive Session  2: Exit
+0
+Starting an interactive session
+Enter directory to store encrypted files:/opt/projects/trading/atp/domains/dev01/vault/
+Enter Keystore URL:/opt/projects/trading/atp/domains/dev01/vault/vault.keystore
+Enter Keystore password:
+Enter Keystore password again:
+Values match
+Enter 8 character salt:western1
+Enter iteration count as a number (Eg: 44):99
+Enter Keystore Alias:vault
+Initializing Vault
+Apr 14, 2014 1:55:37 PM org.picketbox.plugins.vault.PicketBoxSecurityVault init
+INFO: PBOX000361: Default Security Vault Implementation Initialized and Ready
+Vault Configuration in AS7 config file:
+********************************************
+...
+</extensions>
+<vault>
+  <vault-option name="KEYSTORE_URL" value="/opt/projects/trading/atp/domains/dev01/vault/vault.keystore"/>
+  <vault-option name="KEYSTORE_PASSWORD" value="MASK-1yIZ34K4/u2IqftDbKsXT3"/>
+  <vault-option name="KEYSTORE_ALIAS" value="vault"/>
+  <vault-option name="SALT" value="western1"/>
+  <vault-option name="ITERATION_COUNT" value="99"/>
+  <vault-option name="ENC_FILE_DIR" value="/opt/projects/trading/atp/domains/dev01/vault/"/>
+</vault><management> ...
+********************************************
+Vault is initialized and ready for use
+Handshake with Vault complete
+Please enter a Digit::   0: Store a secured attribute  1: Check whether a secured attribute exists  2: Exit
+2
+
+Modify the above XML tag:
+<vault>
+    <vault-option name="KEYSTORE_URL" value="${jboss.domain.base.dir}/vault/vault.keystore"/>
+<vault-option name="KEYSTORE_PASSWORD" value="MASK-1yIZ34K4/u2IqftDbKsXT3"/>
+<vault-option name="KEYSTORE_ALIAS" value="vault"/>
+<vault-option name="SALT" value="western1"/>
+<vault-option name="ITERATION_COUNT" value="99"/>
+<vault-option name="ENC_FILE_DIR" value="${jboss.domain.base.dir}/vault/"/>
+</vault>
+
+
+	
+	
+	
+atp@atpappdev1: pwd
+/opt/projects/trading/atp/domains/dev01
+atp@atpappdev1: /opt/projects/trading/atp/jboss-eap-6.2/bin/vault.sh
+=========================================================================
+
+  JBoss Vault
+
+  JBOSS_HOME: /opt/projects/trading/atp/jboss-eap-6.2
+
+  JAVA: /usr/jdk/jdk1.7.0_51/bin/java
+
+=========================================================================
+
+**********************************
+****  JBoss Vault  ***************
+**********************************
+Please enter a Digit::   0: Start Interactive Session  1: Remove Interactive Session  2: Exit
+0
+Starting an interactive session
+Enter directory to store encrypted files:/opt/projects/trading/atp/domains/dev01/vault/
+Enter Keystore URL:/opt/projects/trading/atp/domains/dev01/vault/vault.keystore
+Enter Keystore password:
+Enter Keystore password again:
+Values match
+Enter 8 character salt:western1
+Enter iteration count as a number (Eg: 44):99
+Enter Keystore Alias:vault
+Initializing Vault
+Apr 15, 2014 7:47:51 AM org.picketbox.plugins.vault.PicketBoxSecurityVault init
+INFO: PBOX000361: Default Security Vault Implementation Initialized and Ready
+Vault Configuration in AS7 config file:
+********************************************
+...
+</extensions>
+<vault>
+  <vault-option name="KEYSTORE_URL" value="/opt/projects/trading/atp/domains/dev01/vault/vault.keystore"/>
+  <vault-option name="KEYSTORE_PASSWORD" value="MASK-1yIZ34K4/u2IqftDbKsXT3"/>
+  <vault-option name="KEYSTORE_ALIAS" value="vault"/>
+  <vault-option name="SALT" value="western1"/>
+  <vault-option name="ITERATION_COUNT" value="99"/>
+  <vault-option name="ENC_FILE_DIR" value="/opt/projects/trading/atp/domains/dev01/vault/"/>
+</vault><management> ...
+********************************************
+Vault is initialized and ready for use
+Handshake with Vault complete
+Please enter a Digit::   0: Store a secured attribute  1: Check whether a secured attribute exists  2: Exit
+0
+Task: Store a secured attribute
+Please enter secured attribute value (such as password):
+Please enter secured attribute value (such as password) again:
+Values match
+Enter Vault Block:AtpSybaseDS
+Enter Attribute Name:password
+Secured attribute value has been stored in vault.
+Please make note of the following:
+********************************************
+Vault Block:AtpSybaseDS
+Attribute Name:password
+Configuration should be done as follows:
+VAULT::AtpSybaseDS::password::1
+********************************************
+Please enter a Digit::   0: Store a secured attribute  1: Check whether a secured attribute exists  2: Exit
+2
+atp@atpappdev1:
+
+
+Modify domain.xml
+
+Modify host1.xml, host2.xml, host3.xml
+<security>
+    <user-name>atp</user-name>
+    <password>${VAULT::AtpSybaseDS::password::1}</password>
+</security>
+
