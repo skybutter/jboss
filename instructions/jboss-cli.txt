@@ -1,0 +1,53 @@
+#********************************************
+export JAVA_HOME=/var/jdk/jdk1.7.0_51
+export JBOSS_HOME=/var/jboss/jboss-eap-6.3
+#********************************************
+
+${JBOSS_HOME}/bin/jboss-cli.sh --connect controller=<your-jboss-domain-host>:9001
+
+
+Change Max Connection Pool Size in a cluster
+/profile=full-ha/subsystem=datasources/data-source=<your-datasource>:write-attribute(name=max-pool-size,value=33)
+
+Enable Pool Statistics (disabled in EAP 6.3 by default)
+/profile=full-ha/subsystem=datasources/data-source=<your-datasource>:write-attribute(name=statistics-enabled,value=true)
+
+Enable Transaction Statistics (disabled in EAP 6.3 by default)
+/profile=full-ha/subsystem=transactions/:write-attribute(name=enable-statistics,value=true)
+
+Get Connection Pool statistic in a server
+/host=host1/server=<jboss-server1>/subsystem=datasources/data-source=<your-datasource>/statistics=pool:read-resource(include-runtime=true)
+/host=host1/server=<jboss-server2>/subsystem=datasources/data-source=<your-datasource>/statistics=pool:read-resource(include-runtime=true)
+/host=host2/server=<jboss-server3>/subsystem=datasources/data-source=<your-datasource>/statistics=pool:read-resource(include-runtime=true)
+
+Get Connection Pool statistic in a server
+cd /host=host1/server=<jboss-server1>/subsystem=datasources/data-source=<your-datasource>/statistics=pool
+ls
+
+<your-jboss-user> Connection Pool
+jboss-cli.sh --connect controller=<your-jboss-domain-host>:9001 --user=<your-jboss-user> --password=<your-jboss-password>command="/host=host1/server=<jboss-server1>/subsystem=datasources/data-source=<your-datasource>/statistics=pool:read-attribute(name=AvailableCount)"
+jboss-cli.sh --connect controller=<your-jboss-domain-host>:9001 --user=<your-jboss-user> --password=<your-jboss-password>command="/host=host1/server=<jboss-server2>/subsystem=datasources/data-source=<your-datasource>/statistics=pool:read-attribute(name=AvailableCount)"
+jboss-cli.sh --connect controller=<your-jboss-domain-host>:9001 --user=<your-jboss-user> --password=<your-jboss-password>command="/host=host2/server=<jboss-server3>/subsystem=datasources/data-source=<your-datasource>/statistics=pool:read-attribute(name=AvailableCount)"
+jboss-cli.sh --connect controller=<your-jboss-domain-host>:9001 --user=<your-jboss-user> --password=<your-jboss-password>command="/host=host2/server=<jboss-server4>/subsystem=datasources/data-source=<your-datasource>/statistics=pool:read-attribute(name=AvailableCount)"
+
+jboss-cli.sh -c controller=<your-jboss-domain-host>:9001 --user=<your-jboss-user> --password=<your-jboss-password>command="/host=host1/server=<jboss-server1>/subsystem=datasources/data-source=<your-datasource>/statistics=pool:read-attribute(name=AvailableCount)"
+
+jboss-cli.sh -c controller=atpappqa1:9001 command="/host=host1/server=<jboss-server1>/subsystem=datasources/data-source=<your-datasource>/statistics=pool:read-attribute(name=AvailableCount)"
+
+
+jboss-cli.sh -c controller=<your-jboss-domain-host>:9001 --user=<your-jboss-user> --password=<your-jboss-password>command="/host=host1/server=<jboss-server1>/subsystem=datasources/data-source=<your-datasource>/statistics=pool:read-attribute(name=AvailableCount)"
+
+jboss-cli.sh -c controller=<your-jboss-domain-host>:9001 --user=<your-jboss-user> --password=<your-jboss-password>command="/host=host1/server=<jboss-server1>/subsystem=datasources/data-source=<your-datasource>/statistics=pool:read-attribute(name=AvailableCount)"
+
+jboss-cli.sh -c controller=atpappqa1:9001 /host=host1/server=<jboss-server1>/subsystem=datasources/data-source=<your-datasource>/:flush-all-connection-in-pool
+
+jboss-cli.sh -c controller=atpappqa1:9001 /host=host1/server=<jboss-server1>/subsystem=datasources/data-source=<your-datasource>/:flush-idle-connection-in-pool
+
+*****************************
+** Apply Patch 
+./bin/jboss-cli.sh "patch apply <path-to-jboss-patch-file>/jboss-eap-6.3.1-patch.zip"
+
+set JBOSS_HOME=c:\jboss-eap-6.4
+cd jboss-eap-6.4
+./bin/jboss-cli.sh "patch apply <path-to-jboss-patch-file>/jboss-eap-6.4.6-patch.zip"
+************************************
