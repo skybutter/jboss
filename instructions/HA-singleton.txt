@@ -1,0 +1,950 @@
+JBoss HA Singleton Service Sample implementation
+==================================================================================================================
+1. Create a text file called org.jboss.msc.service.ServiceActivator
+	This file tells JBoss to start the cluster Singleton service.
+	Put in the class name with full package of the HATimerServiceActivator class
+	Ex file content:
+		ha.singleton.HATimerServiceActivator
+		
+2.  Package the file in the EAR file META-INF/services
+		In Maven, the file is in server project, src/main/resources/META-INF/services/org.jboss.msc.service.ServiceActivator
+
+3.  Enable the clustering singleton in the JBoss EAR
+	Create or Modify jboss-deployment-structure.xml for the EAR
+		In Maven, the file is in EAR project, src/main/application/META-INF/jboss-deployment-structure.xml
+	Note: org.jboss.as.clustering.singleton
+<?xml version="1.0" encoding="UTF-8"?>
+<jboss-deployment-structure>
+  <!-- By default, we'll make all artifacts in this ear visible to each other by setting isolation to false -->
+  <ear-subdeployments-isolated>false</ear-subdeployments-isolated>
+  <deployment>   
+    <exclude-subsystems>  
+<!--       <subsystem name="jaxrs" />   -->
+      <!-- <subsystem name="webservices" />-->  
+    </exclude-subsystems> 
+    <dependencies>
+      <module name="org.jboss.as.naming" export="true" /> 
+      <module name="org.jboss.as.clustering.singleton" export="true" />
+      <module name="org.jboss.msc" export="true" />
+      <module name="org.jboss.as.server" export="true" />
+      <module name="deployment.my-parent.ear" export="true"/>
+      <module name="deployment.my-parent.ear.my-parent-server.jar" export="true" />
+    </dependencies>
+  </deployment>
+  <sub-deployment name="my-module-web.war">
+    <dependencies>
+      <module name="deployment.my-module.ear.my-module-server.jar" />
+    </dependencies>
+  </sub-deployment>
+</jboss-deployment-structure>
+
+4.  Create the following Java classes in the my-module-server:
+		HATimerServiceActivator
+		HATimerService
+	
+	Note:
+		project
+			project-ear
+			project-server
+			project-client
+			project-common
+			project-web
+	The Singleton service code is in the project-server.
+
+5.  This example use annotate the implementation class for the task with @Singleton to make it a singleton EJB class.
+
+//Java Code
+//================================================================================================================
+package ha.singleton;
+
+import java.util.logging.Logger;
+
+import org.jboss.as.clustering.singleton.SingletonService;
+import org.jboss.as.naming.deployment.ContextNames;
+import org.jboss.as.server.ServerEnvironment;
+import org.jboss.as.server.ServerEnvironmentService;
+import org.jboss.msc.service.DelegatingServiceContainer;
+import org.jboss.msc.service.ServiceActivator;
+import org.jboss.msc.service.ServiceActivatorContext;
+import org.jboss.msc.service.ServiceBuilder;
+import org.jboss.msc.service.ServiceController;
+
+
+/**
+ * Service activator that installs the HATimerService as a clustered singleton service
+ * during deployment.
+ *
+ * @author Paul Ferraro
+ */
+public class HATimerServiceActivator implements ServiceActivator {
+    private final static Logger log = Logger.getLogger(HATimerServiceActivator.class.getName());
+
+    @Override
+    public void activate(ServiceActivatorContext context) {
+        log.info("HATimerService will be installed!");
+
+        HATimerService service = new HATimerService();
+        SingletonService<String> singleton = new SingletonService<String>(service, HATimerService.SINGLETON_SERVICE_NAME);
+        /*
+         * We can pass a chain of election policies to the singleton, for example to tell JGroups to prefer running the singleton on a node with a
+         * particular name
+         */
+        // singleton.setElectionPolicy(new PreferredSingletonElectionPolicy(new SimpleSingletonElectionPolicy(), new NamePreference("node2/cluster")));
+
+        // Workaround for JBoss AS 7.1.2
+        // In later releases, SingleService.build(...) accepts a service target
+        /*singleton.build(new DelegatingServiceContainer(context.getServiceTarget(), context.getServiceRegistry()))
+                // singleton.build(context.getServiceTarget())
+                .addDependency(ServerEnvironmentService.SERVICE_NAME, ServerEnvironment.class, service.env)
+                .setInitialMode(ServiceController.Mode.ACTIVE).install();*/
+        
+        ServiceBuilder<String> builder = singleton.build(new DelegatingServiceContainer(context.getServiceTarget(), context.getServiceRegistry()));
+		
+		// To avoid starting the service too soon before the JNDI or EJB is up, add dependency here
+        builder.addDependency(ContextNames.GLOBAL_CONTEXT_SERVICE_NAME.append("my-module", "my-module-server", "MySingletonScheduler" + "!" + Scheduler.class.getName()));
+
+        builder.addDependency(ContextNames.GLOBAL_CONTEXT_SERVICE_NAME.append("my-module", "my-module-server", "MySingletonListener" + "!" + MySingletonListener.class.getName()));
+		
+        org.jboss.as.server.Services.addServerExecutorDependency(builder, service.threadPool, false);
+
+        builder.addDependency(ServerEnvironmentService.SERVICE_NAME, ServerEnvironment.class, service.env);
+        builder.setInitialMode(ServiceController.Mode.ACTIVE);
+        builder.install();
+    }
+}
+//================================================================================================================
+/*
+ * JBoss, Home of Professional Open Source
+ * Copyright 2012, Red Hat, Inc. and/or its affiliates, and individual
+ * contributors by the @authors tag. See the copyright.txt in the 
+ * distribution for a full listing of individual contributors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package ha.singleton;
+
+import java.util.Date;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import org.jboss.as.server.ServerEnvironment;
+import org.jboss.msc.service.Service;
+import org.jboss.msc.service.ServiceName;
+import org.jboss.msc.service.StartContext;
+import org.jboss.msc.service.StartException;
+import org.jboss.msc.service.StopContext;
+import org.jboss.msc.value.InjectedValue;
+
+/**
+ * A service to start schedule-timer as HASingleton timer in a clustered environment.
+ * The service will ensure that the timer is initialized only once in a cluster.
+ *
+ * @author <a href="mailto:wfink@redhat.com">Wolf-Dieter Fink</a>
+ */
+public class HATimerService implements Service<String> {
+    private static final Logger LOGGER = Logger.getLogger(HATimerService.class.getName());
+    public static final ServiceName SINGLETON_SERVICE_NAME = ServiceName.JBOSS.append("appname", "singleton", "timer");
+
+    /**
+     * A flag whether the service is started.
+     */
+    private final AtomicBoolean started = new AtomicBoolean(false);
+
+    final InjectedValue<ServerEnvironment> env = new InjectedValue<ServerEnvironment>();
+
+    final InjectedValue<ExecutorService> threadPool = new InjectedValue<ExecutorService>();
+    
+    /**
+     * @return the name of the server node
+     */
+    public String getValue() throws IllegalStateException, IllegalArgumentException {
+        if (!started.get()) {
+            throw new IllegalStateException("The service '" + this.getClass().getName() + "' is not ready!");
+        }
+        return this.env.getValue().getNodeName();
+    }
+
+    public void start(final StartContext context) throws StartException {
+        if (!started.compareAndSet(false, true)) {
+            throw new StartException("The service is still started!");
+        }
+        LOGGER.info("Start HA timer service '" + this.getClass().getName() + "'");
+        context.asynchronous();
+        threadPool.getValue().execute(new Runnable() {
+            public void run() {
+                try {
+                    String nodeName = env.getValue().getNodeName();
+                    
+                    Scheduler scheduledTask2 = (Scheduler) JndiLookup.getInstance().getLocalBean("my-module", "my-module-server", Scheduler.class, "MySingletonScheduler");
+                    scheduledTask2.setUpSchedule("MySingletonScheduler @" + nodeName + " " + new Date());
+                    
+                    MySingletonListener myListener = (MySingletonListener) JndiLookup.getInstance().getLocalBean("my-module", "my-module-server", MySingletonListener.class, "MySingletonListener");
+					
+                    myListener.activate();
+                } catch (Exception e) {
+                    LOGGER.log(Level.SEVERE, "Error starting SingletonService", e);
+                    context.failed(new StartException(e));
+                } finally {
+                    context.complete();
+                }
+            }
+        });
+    }
+
+    public void stop (StopContext context) {
+        if (!started.compareAndSet(true, false)) {
+            LOGGER.warning("The service '" + this.getClass().getName() + "' is not active!");
+        }
+        // Stopping each Scheduler or Listener in the class itself using @PreDestroy
+    }
+}
+//================================================================================================================
+package ha.singleton.task;
+
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import javax.annotation.PreDestroy;
+import javax.ejb.Singleton;
+
+@Singleton
+public class MySingletonListener {
+	
+	private Logger logger = Logger.getLogger(MySingletonListener.class.getName());
+	private MyJmsSubscriber myJmsSubscriber = null;
+	
+	// Start your own process here.  
+	// This example use JMS Listener.  You probably need to run your stuff in its own thread
+	public void activate() {
+		try{
+			// Run your own stuff here
+		} catch (Throwable t) {
+			logger.log(Level.SEVERE, "Unable to activate singleton service MySingletonListener.", t);
+		}
+	}
+
+	@PreDestroy
+	public void deactivate() {
+		try {
+			if(myJmsSubscriber != null) {
+                myJmsSubscriber.close();
+            }		
+			myJmsSubscriber = null;
+			logger.log(Level.INFO, "MyJmsSubscriber has been closed successfully.");
+		}catch (Throwable t) {
+			logger.log(Level.SEVERE, "Unable to deactivate MySingletonListener.", t);
+		}	
+	}
+}
+================================================================================================================
+package ha.singleton.task;
+/**
+ * @author <a href="mailto:wfink@redhat.com">Wolf-Dieter Fink</a> 
+ * From JBoss example, and modified for your need.
+ * 
+ */
+public interface Scheduler {
+    void setUpSchedule(String info);
+    void stopScheduledTask();
+}
+=================================================================================================================
+package ha.singleton.task;
+
+import java.util.Date;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import javax.annotation.PreDestroy;
+import javax.annotation.Resource;
+import javax.ejb.ScheduleExpression;
+import javax.ejb.Singleton;
+import javax.ejb.Timeout;
+import javax.ejb.Timer;
+import javax.ejb.TimerConfig;
+import javax.ejb.TimerService;
+
+@Singleton
+public class MySingletonScheduler implements Scheduler {
+    private static Logger LOGGER = Logger.getLogger(MySingletonScheduler.class.getName());
+    
+    @Resource
+    private TimerService timerService;
+
+    @Timeout
+    public void runScheduledTask(Timer timer) {
+        try {
+            // do something
+        } catch (Throwable e) {
+            LOGGER.log(Level.SEVERE, "Unable to perform the task.", e);
+        } finally {
+			// Log something to the output so you can see when the task is executed.
+        }
+    }
+
+	// Get the timer interval in seconds
+    public int getInterval() {
+        return 5;
+    }
+    
+    @Override
+    public void setUpSchedule(String info) {
+        ScheduleExpression sexpr = new ScheduleExpression();
+        // setting initial start time.
+        Date startDate = new Date(System.currentTimeMillis());
+        sexpr = sexpr.start(startDate);
+
+        // set schedule to every 10 seconds for demonstration
+        // sexpr.hour("*").minute("*").second("0/10");
+        // http://docs.oracle.com/javaee/6/api/javax/ejb/ScheduleExpression.html
+        String second = "0/" + getInterval().toString();
+        sexpr.hour("*").minute("*").second(second);
+        timerService.createCalendarTimer(sexpr, new TimerConfig(info, false));
+    }
+
+    @Override
+    @PreDestroy
+    public void stopScheduledTask() {
+        LOGGER.info("Stopping MySingletonScheduler");
+        for (Timer timer : timerService.getTimers()) {
+            LOGGER.info("Stop MySingletonScheduler timer: " + timer.getInfo());
+            timer.cancel();
+        }
+    }
+}
+//=======================================================================================================
+/*
+ * Created on May 15, 2003
+ * 
+ * To change the template for this generated file go to
+ * Window>Preferences>Java>Code Generation>Code and Comments
+ */
+package ha.singleton;
+
+import java.rmi.RemoteException;
+import java.util.*;
+import java.util.logging.*;
+
+import javax.jms.TopicConnection;
+import javax.jms.TopicConnectionFactory;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import javax.sql.DataSource;
+import javax.transaction.TransactionManager;
+import javax.transaction.UserTransaction;
+
+import org.apache.commons.pool.BasePoolableObjectFactory;
+import org.apache.commons.pool.ObjectPool;
+import org.apache.commons.pool.impl.GenericObjectPool;
+import org.jboss.ejb.client.ContextSelector;
+import org.jboss.ejb.client.EJBClientConfiguration;
+import org.jboss.ejb.client.EJBClientContext;
+import org.jboss.ejb.client.PropertiesBasedEJBClientConfiguration;
+import org.jboss.ejb.client.remoting.ConfigBasedEJBClientContextSelector;
+
+/**
+ * This class is used to lookup EJB bean.  
+ * I would make this into 2 separate class, one for client and another for server.
+ * But here, it is combined.
+ * For the ejb-client, we are not using jboss-ejb-client.properties file, but setting properties in java code.
+ *  
+ */
+public class JndiLookup {
+    private static Logger LOGGER = Logger.getLogger(JndiLookup.class.getName());
+    private static JndiLookup instance = new JndiLookup();
+
+    private static String DATASOURCE = "java:jboss/datasources/AtpSybaseDS";
+
+    //Context is pooled using apache pool library
+    private ObjectPool<Context> ejbServerSideContextPool, ejbClientSideContextPool;
+    private ObjectPool<Context> nonEjbServerSideContextPool, nonEjbClientSideContextPool;
+    
+    private Properties connectionProperties;
+
+    private static String JMS_LOCAL_CONN_FACTORY = "java:/ConnectionFactory";
+    private static String JMS_REMOTE_CONN_FACTORY = "jms/RemoteConnectionFactory";
+
+    private static String JTS_USER_TRANSACTION = "java:jboss/UserTransaction";
+    private static String TRANSACTION_MANAGER = "java:jboss/TransactionManager";
+
+    private String remoteConnectionsURI;
+    private String localConnectionsURI;
+    
+    private String securityPrincipal;
+    private String securityCredential;
+    private String jbossRemotingWindowSize;
+    
+    private static class ConnectionProperty {
+        String connectionString;
+        String id;
+        String machineName;
+        String port;
+        
+        public ConnectionProperty(String token, String pId) {
+            connectionString = token;
+            String[] tokens = connectionString.split(":");
+            machineName = tokens[0];
+            port = tokens[1];
+            id = pId;
+        }
+    }
+    
+    private static class EJBServerSideContextPoolableObjectFactory extends BasePoolableObjectFactory<Context> {
+
+        @Override
+        public Context makeObject() throws Exception {
+            Properties props = new Properties();
+            props.put(Context.INITIAL_CONTEXT_FACTORY, "org.jboss.as.naming.InitialContextFactory");
+            return new InitialContext(props);
+        }
+        
+        @Override
+        public void destroyObject(Context obj) throws Exception  {
+            if (obj==null) {
+                return;
+            }
+            
+            obj.close();
+        }
+
+    }
+
+    private static class EJBClientSideContextPoolableObjectFactory extends BasePoolableObjectFactory<Context> {
+
+        @Override
+        public Context makeObject() throws Exception {
+            final Hashtable<String,String> jndiProperties = new Hashtable<String,String>();
+            jndiProperties.put(Context.URL_PKG_PREFIXES, "org.jboss.ejb.client.naming");
+            return new InitialContext(jndiProperties);                
+        }
+
+        @Override
+        public void destroyObject(Context obj) throws Exception  {
+            if (obj==null) {
+                return;
+            }
+            obj.close();
+        }
+    }
+
+    private static class NonEJBServerSideContextPoolableObjectFactory extends BasePoolableObjectFactory<Context> {
+
+        @Override
+        public Context makeObject() throws Exception {
+            Properties props = new Properties();
+            props.put(Context.INITIAL_CONTEXT_FACTORY, "org.jboss.as.naming.InitialContextFactory");
+            return new InitialContext(props);                
+        }
+        
+        @Override
+        public void destroyObject(Context obj) throws Exception  {
+            if (obj==null) {
+                return;
+            }
+            
+            obj.close();
+        }
+    }
+
+    private static class NonEJBClientSideContextPoolableObjectFactory extends BasePoolableObjectFactory<Context> {
+        private Properties props;
+        
+        public NonEJBClientSideContextPoolableObjectFactory(Properties p) {
+            props = p;
+        }
+        
+        @Override
+        public Context makeObject() throws Exception {
+            return new InitialContext(props);                                
+        }
+        
+        @Override
+        public void destroyObject(Context obj) throws Exception  {
+            if (obj==null) {
+                return;
+            }
+            
+            obj.close();
+        }
+    }
+
+    private JndiLookup() {
+        
+        List<ConnectionProperty> connections = parseConnectionsProperty();
+        setEJBConnectionProperties(connections);
+        setRemoteConnectionsURI(connections);
+        
+        if (!isServerSide()) {
+            EJBClientConfiguration ejbClientConfiguration = new PropertiesBasedEJBClientConfiguration(connectionProperties);
+            ContextSelector<EJBClientContext> ejbClientContextSelector = new ConfigBasedEJBClientContextSelector(ejbClientConfiguration);
+            EJBClientContext.setSelector(ejbClientContextSelector);            
+        }
+        
+        EJBServerSideContextPoolableObjectFactory ejbServerFactory = new EJBServerSideContextPoolableObjectFactory();
+        ejbServerSideContextPool = new GenericObjectPool<Context>(ejbServerFactory);
+        
+        EJBClientSideContextPoolableObjectFactory ejbClientFactory = new EJBClientSideContextPoolableObjectFactory();
+        ejbClientSideContextPool = new GenericObjectPool<Context>(ejbClientFactory); 
+
+        NonEJBServerSideContextPoolableObjectFactory nonEjbServerFactory = new NonEJBServerSideContextPoolableObjectFactory();
+        nonEjbServerSideContextPool = new GenericObjectPool<Context>(nonEjbServerFactory);
+        
+        Properties props = new Properties();
+        props.put(Context.INITIAL_CONTEXT_FACTORY, "org.jboss.naming.remote.client.InitialContextFactory");
+        props.put(Context.PROVIDER_URL, remoteConnectionsURI);
+        props.put(Context.SECURITY_PRINCIPAL, securityPrincipal);
+        props.put(Context.SECURITY_CREDENTIALS, securityCredential);
+
+        NonEJBClientSideContextPoolableObjectFactory nonEjbClientFactory = new NonEJBClientSideContextPoolableObjectFactory(props);
+        nonEjbClientSideContextPool = new GenericObjectPool<Context>(nonEjbClientFactory); 
+    }
+    
+	private boolean isServerSide() {
+		// logic to determine if the code is on server or client side
+	}
+    private List<ConnectionProperty> parseConnectionsProperty() {
+        List<ConnectionProperty> toBeReturned = new ArrayList<ConnectionProperty>();
+        String remoteConnectionsPropertyString = null;
+
+        if (isServerSide()) {
+			// should read the following from properties file
+            remoteConnectionsPropertyString = "10.10.10.11:4548,10.10.10.12:4648";
+            securityPrincipal = "jboss-app-username";
+            securityCredential = "jboss-app-pwd";
+        } else {
+            remoteConnectionsPropertyString = "10.10.10.11:4548,10.10.10.12:4648";  
+            String encryptedSP = "jboss-app-username-encrypted";		// using encrypted string at the client
+            String encryptedSC = "jboss-app-username-encrypted";		// using encrypted string at the client;
+
+            securityPrincipal = JNLPCipherUtil.decrypt(encryptedSP);
+            securityCredential = JNLPCipherUtil.decrypt(encryptedSC);            
+            
+            jbossRemotingWindowSize = "262144";		// 819200
+        }
+
+        String splittedConnectionsProperty[] = remoteConnectionsPropertyString.split(",");
+        
+        for (int i=0; i<splittedConnectionsProperty.length; i++) {
+            ConnectionProperty aConnection = new ConnectionProperty(splittedConnectionsProperty[i], Integer.toString(i));
+            toBeReturned.add(aConnection);
+        }
+        
+        return toBeReturned;
+    }
+
+    private void setEJBConnectionProperties(List<ConnectionProperty> listOfConnections) {
+        String remotePrefix = "remote.connection.";
+        String machineNamePostfix = ".host";
+        String portPostfix = ".port";
+        String policyPostfix = ".connect.options.org.xnio.Options.SASL_POLICY_NOANONYMOUS";
+        String usernamePostfix = ".username";
+        String passwordPostfix = ".password";
+
+        connectionProperties = new Properties();
+        
+        StringBuilder connectionsIdStringBuilder = new StringBuilder();
+        Iterator<ConnectionProperty> i = listOfConnections.iterator();
+        while (i.hasNext()) {
+            ConnectionProperty con = i.next();
+            
+            String keyMachine = remotePrefix + con.id + machineNamePostfix;
+            String valMachine = con.machineName;
+            connectionProperties.put(keyMachine, valMachine);
+            
+            String keyPort = remotePrefix + con.id + portPostfix;
+            String valPort = con.port;
+            connectionProperties.put(keyPort, valPort);
+
+            String keyPolicy = remotePrefix + con.id + policyPostfix;
+            connectionProperties.put(keyPolicy, "false");
+            
+            String userName = remotePrefix + con.id + usernamePostfix;
+            connectionProperties.put(userName, securityPrincipal);
+            
+            String password = remotePrefix + con.id + passwordPostfix;
+            connectionProperties.put(password, securityCredential);
+
+            if (jbossRemotingWindowSize!=null) {
+                // Improve JBoss RMI performance application transfer large amount of data in EJB calls.
+                // Part of the change is in the domain.xml to set the server side.
+                // Another part of the change is here to set the client side remoting EJB call.
+                String remoting = remotePrefix + con.id + ".connect.options.org.jboss.remoting3.RemotingOptions.RECEIVE_WINDOW_SIZE";
+                connectionProperties.put(remoting, jbossRemotingWindowSize);       // 16 x default of 8192                
+            } else {
+                LOGGER.fine("JBoss remoting receive window size not set.");
+            }
+
+            connectionsIdStringBuilder.append(con.id);
+            if (i.hasNext()) {
+                connectionsIdStringBuilder.append(",");
+            }
+        }
+        
+        connectionProperties.put("remote.connections", connectionsIdStringBuilder.toString());
+        connectionProperties.put("endpoint.name","endpoint");
+        connectionProperties.put("remote.connectionprovider.create.options.org.xnio.Options.SSL_ENABLED","false");
+        
+        //QC# 73231 Spread the load on server more evenly for EJB calls
+        connectionProperties.put("remote.clusters","ejb");
+        connectionProperties.put("remote.cluster.ejb.connect.options.org.xnio.Options.SASL_POLICY_NOANONYMOUS","true");
+        connectionProperties.put("remote.cluster.ejb.connect.options.org.xnio.Options.SASL_POLICY_NOPLAINTEXT","true");
+        connectionProperties.put("remote.cluster.ejb.username",securityPrincipal);
+        connectionProperties.put("remote.cluster.ejb.password",securityCredential);
+    }
+    
+    private void setRemoteConnectionsURI(List<ConnectionProperty> listOfConnections) {
+        String remotePrefix = "remote://";
+        StringBuilder remoteConnectionsStringBuilder = new StringBuilder();
+        StringBuilder localConnectionsStringBuilder = new StringBuilder();
+        Iterator<ConnectionProperty> i = listOfConnections.iterator();
+        while (i.hasNext()) {
+            ConnectionProperty con = i.next();
+            remoteConnectionsStringBuilder.append(remotePrefix);
+            remoteConnectionsStringBuilder.append(con.connectionString);
+            localConnectionsStringBuilder.append(con.connectionString);
+            
+            if (i.hasNext()) {
+                remoteConnectionsStringBuilder.append(",");
+                localConnectionsStringBuilder.append(",");
+            }
+        }      
+        
+        remoteConnectionsURI = remoteConnectionsStringBuilder.toString();
+        localConnectionsURI = localConnectionsStringBuilder.toString();
+    }
+    
+    public static synchronized JndiLookup getInstance() {
+        if (instance==null) {
+            instance = new JndiLookup();
+        }
+        
+        return instance;
+    }
+    
+    public UserTransaction getUserTransaction() throws Exception {
+        UserTransaction utObject = null;
+        Context ic = null;
+        try {
+            ic = borrowContextFromPool();
+            utObject = (UserTransaction) ic.lookup(JTS_USER_TRANSACTION);
+        } finally {
+            returnNonEJBContextToPool(ic);
+        }
+        
+        return utObject;        
+    }
+
+    public TransactionManager getTransactionManager() throws Exception {
+        TransactionManager tmObject = null;
+        Context ic = null;
+        try {
+            ic = borrowContextFromPool();
+            tmObject = (TransactionManager) ic.lookup(TRANSACTION_MANAGER);
+        } finally {
+            returnNonEJBContextToPool(ic);
+        }
+        return tmObject;                
+    }
+    
+    public DataSource getDataSource() throws Exception {
+        DataSource dsObject = null;
+        Context ic = null;
+        try {
+            ic = borrowContextFromPool();
+            dsObject = (DataSource) ic.lookup(DATASOURCE);
+        } finally {
+            returnNonEJBContextToPool(ic);
+        }
+        return dsObject;        
+    }
+    
+    /**
+     * jndiName is the actual implementation class name
+     */
+    @SuppressWarnings("unchecked")
+    public <E> E getRemoteBean(String appName, String moduleName, Class<E> remoteClass, String jndiName) throws RemoteException {
+        if (appName == null || moduleName == null) {
+            throw new IllegalArgumentException("You need to supply app name and module name!");
+        }
+
+        E remoteObject = null;
+        Context ic = null;
+        try {
+            final String ejbJNDIPrefix = "ejb:" + appName + "/" + moduleName + "//";
+            ic = borrowEJBContextFromPool();
+            remoteObject = (E) ic.lookup(ejbJNDIPrefix + jndiName + "!" + remoteClass.getName());
+        } catch (Throwable e) {
+            LOGGER.log(Level.SEVERE, "Unable to lookup!", e);
+            throw new RemoteException("Unable to lookup!", e);
+        } finally {
+            returnEJBContextToPool(ic);
+        }
+
+        return remoteObject;
+    }
+
+    /**
+     * jndiName is the actual implementation class name
+     */
+    @SuppressWarnings("unchecked")
+    public <E> E getLocalBean(String appName, String moduleName, Class<E> remoteClass, String jndiName) throws RemoteException {
+        if (appName==null || moduleName==null) {
+            throw new IllegalArgumentException("You need to supply app name and module name!");
+        }
+
+        E localObject = null;
+        Context ic = null;
+        try {
+            final String singletonJNDIPrefix = "global/" + appName + "/" + moduleName + "/";
+            ic = borrowEJBContextFromPool();
+            localObject = (E) ic.lookup(singletonJNDIPrefix + jndiName + "!" + remoteClass.getName());
+        } catch (Throwable e) {
+            LOGGER.log(Level.SEVERE,"Unable to lookup!", e);
+            throw new RemoteException("Unable to lookup!", e);
+        } finally {
+            returnEJBContextToPool(ic);
+        }
+
+        return localObject;        
+    }
+    
+    public TopicConnection createTopicConnection() throws Exception {
+        TopicConnectionFactory tcf = (TopicConnectionFactory) getConnectionFactory();
+        TopicConnection tcfConnection = tcf.createTopicConnection(securityPrincipal, securityCredential);
+        
+        return tcfConnection;
+    }
+    
+    public Object getEntityManager(String entityManager) throws Exception {        
+        Object toBeReturned = null;
+        Context ic = null;
+        try {
+            ic = borrowContextFromPool();
+            toBeReturned = ic.lookup(entityManager);
+        } finally {
+            returnNonEJBContextToPool(ic);
+        }
+
+        return toBeReturned;
+    }
+    
+    public Object getConnectionFactory() throws Exception {
+        Object cf = null;
+        String connFactoryName;
+        if (isServerSide()) {
+            connFactoryName = JMS_LOCAL_CONN_FACTORY;
+        } else {
+            connFactoryName = JMS_REMOTE_CONN_FACTORY;    
+        }
+        
+        Context ic = null;
+        try {
+            ic = borrowContextFromPool();
+            cf = ic.lookup(connFactoryName);
+        } finally {
+            returnNonEJBContextToPool(ic);
+        }
+        return cf;        
+    }
+    
+    public static String getConnectionFactoryJNDIName() {
+        if (isServerSide()) {
+            return JMS_LOCAL_CONN_FACTORY;
+        }
+        
+        return JMS_REMOTE_CONN_FACTORY;        
+    }
+    
+    public String getConnectionURI() {
+        if (isServerSide()) {
+            return localConnectionsURI;
+        }
+        
+        return remoteConnectionsURI;
+    }
+    
+    public Object lookup(String jndiName) throws Exception {
+        Object object = null;
+        Context ic = null;
+        try {
+            ic = borrowContextFromPool();
+            object = ic.lookup(jndiName);
+        } finally {
+            returnNonEJBContextToPool(ic);
+        }
+        return object;        
+    }
+
+    private void returnNonEJBContextToPool(Context context) {
+        if (context != null) {
+            try {
+                if (isServerSide()) {
+                    nonEjbServerSideContextPool.returnObject(context);
+                } else {
+                    nonEjbClientSideContextPool.returnObject(context);
+                }
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Unable to return Non-EJB context to cache!", e);
+                try {
+                    context.close();
+                } catch (NamingException e1) {
+                    LOGGER.log(Level.SEVERE, "Unable to close context!", e1);
+                }                
+            }
+        }
+    }        
+
+    private Context borrowContextFromPool() throws Exception {
+        Context toBeReturned = null;
+        if (isServerSide()) {
+            toBeReturned = nonEjbServerSideContextPool.borrowObject();
+        } else {
+            toBeReturned = nonEjbClientSideContextPool.borrowObject();
+        }
+
+        return toBeReturned;
+    }
+    
+    private void returnEJBContextToPool(Context context) {
+        if (context!=null) {
+            try {
+                if (isServerSide()) {
+                    ejbServerSideContextPool.returnObject(context);
+                } else {
+                    ejbClientSideContextPool.returnObject(context);
+                }
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Unable to return EJB context to cache!", e);
+                try {
+                    context.close();
+                } catch (NamingException e1) {
+                    LOGGER.log(Level.SEVERE, "Unable to close context!", e1);
+                }
+            }
+        }
+    }
+    
+    private Context borrowEJBContextFromPool() throws Exception {
+        Context toBeReturned = null;
+        if (isServerSide()) {
+            toBeReturned = ejbServerSideContextPool.borrowObject();
+        } else {
+            toBeReturned = ejbClientSideContextPool.borrowObject();
+        }
+
+        return toBeReturned;
+    }
+}
+// ====================================================================================================================
+package ha.singleton;
+
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.DESedeKeySpec;
+import org.apache.commons.codec.binary.Base64;
+
+import org.apache.commons.lang.StringUtils;
+
+//Use apache common.codec Base64 API to encode/decode JNLP strings
+
+public class JNLPCipherUtil {
+
+	private static Logger LOGGER = Logger.getLogger(JNLPCipherUtil.class.getName());
+	
+	private static String passPhrase = "secret";
+	private static String tripleDESTransformation = "DESede";
+	private static SecretKey tripleDESKey = JNLPCipherUtil.createTripleDESKey(passPhrase);
+	
+	public static String encrypt(String toBeEncrypted) {
+		try {
+	        // Encrypt
+	        byte[] toBeEncryptedBytes = toBeEncrypted.getBytes();
+	        Cipher cipher = Cipher.getInstance(tripleDESTransformation);
+	        cipher.init(Cipher.ENCRYPT_MODE, tripleDESKey);
+	        byte[] encryptedBytes = cipher.doFinal(toBeEncryptedBytes);
+	        
+	        // Encode bytes to base64 to get a string
+			//String encryptedString = new BASE64Encoder().encode(encryptedBytes);
+	        //Use apache common.codec Base64 API to encode/decode JNLP strings
+			String encryptedString = Base64.encodeBase64String(encryptedBytes);
+			return encryptedString;
+		} catch(Exception e) {
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
+		}
+		
+		return null;
+	}
+
+	public static String decrypt(String encrypted) {
+		try {
+			// Decode base64 to get bytes
+			//byte[] decodedEncrypted = new BASE64Decoder().decodeBuffer(encrypted);
+			//Use apache common.codec Base64 API to encode/decode JNLP strings
+			byte[] decodedEncrypted = Base64.decodeBase64(encrypted);
+
+	        // Decrypt
+	        Cipher cipher = Cipher.getInstance(tripleDESTransformation);
+	        cipher.init(Cipher.DECRYPT_MODE, tripleDESKey);
+	        byte[] decryptedBytes = cipher.doFinal(decodedEncrypted);
+	        String decryptedString = new String(decryptedBytes);
+	        return decryptedString;
+		} catch(Exception e) {
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
+		}
+		
+		return null;
+	}
+
+	public static SecretKey createTripleDESKey(String passPhrase) {
+		try {
+		    // pass phrase must be 24 characters
+		    passPhrase = StringUtils.leftPad(passPhrase, 24);
+			byte[] passPhraseBytes = passPhrase.getBytes();
+	        DESedeKeySpec keySpec = new DESedeKeySpec(passPhraseBytes);
+	        SecretKeyFactory factory = SecretKeyFactory.getInstance(tripleDESTransformation);
+	        SecretKey key = factory.generateSecret(keySpec);
+	        return key;
+		} catch(Exception e) {
+			LOGGER.log(Level.SEVERE, e.getMessage(), e);
+		}
+		
+		return null;
+	}
+
+	public static void main(String[] args) {
+		if(args.length != 2) {
+			System.out.println("Run java command: java JNLPCipherUtil <securityprincipal> <securitycredential>");
+			return;
+		}
+
+		// jndi security principal
+		String securityPrincipal = args[0];
+		
+		// jndi security credential
+		String securityCredential = args[1];
+
+		// encrypt/decrypt jndi security principal
+		String encryptedSP = encrypt(securityPrincipal);
+        System.out.println("encrypted: " + encryptedSP);
+        System.out.println("decrypted: " + decrypt(encryptedSP));
+        
+        // encrypt/decrypt jndi security credential
+        String encryptedSC = encrypt(securityCredential);
+        System.out.println("encrypted: " + encryptedSC);
+        System.out.println("decrypted: " + decrypt(encryptedSC));
+	}
+}

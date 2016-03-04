@@ -1,0 +1,92 @@
+Remote EJB call from clients not load balanced across all nodes
+========================================================================
+The jboss-ejb3.xml and the remote.cluster settings address the issue
+
+Here is a sample jboss-ejb3.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<jboss:ejb-jar xmlns:jboss="http://www.jboss.com/xml/ns/javaee"
+                  xmlns="http://java.sun.com/xml/ns/javaee"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xmlns:s="urn:security"
+                  xmlns:c="urn:clustering:1.0"
+                  xsi:schemaLocation="http://www.jboss.com/xml/ns/javaee"
+                  version="3.1"
+                  impl-version="2.0">
+    <enterprise-beans>
+    </enterprise-beans>
+      <assembly-descriptor>
+      <!-- mark all EJB's of the application as clustered (without using the jboss specific @Clustered annotation for each class) -->
+      <c:clustering>
+          <ejb-name>*</ejb-name>
+          <c:clustered>true</c:clustered>
+      </c:clustering>
+      </assembly-descriptor>
+</jboss:ejb-jar>
+
+
+
+==========================================================================================
+How to configure clustered EJB load balancing policy in EAP 6
+https://access.redhat.com/solutions/162293
+
+For a JavaEE application
+
+The outbound connections are configured in the jboss-ejb-client.xml descriptor. The Selector needs to be added to the cluster configuration as follows:
+
+Raw
+<jboss-ejb-client xmlns:xsi="urn:jboss:ejb-client:1.2">
+  <client-context >
+    <ejb-receivers >
+      ...
+    </ejb-receivers>
+
+    <clusters>
+      <cluster ... cluster-node-selector="my.package.MyClusterNodeSelector">
+      </cluster>
+    </clusters>
+  </client-context>
+</jboss-ejb-client>
+
+For a standalone client with properties
+
+The connections are configured in the jboss-ejb-client.properties file. The Selector needs to be added like this:
+
+Raw
+remote.connections=default
+remote.connection.default.host=localhost
+remote.connection....
+
+remote.clusters=ejb
+remote.cluster....
+remote.cluster.ejb.clusternode.selector=my.package.MyClusterNodeSelector
+If the EJBClientContext is set programaticaly
+
+Raw
+Properties p = new Properties();
+p.put("remote.connections", "default");
+p.put("remote.connection.default.host", "localhost");
+p.put(.......)  // other properties
+
+final String clusterName = "ejb";
+p.put("remote.clusters", clusterName);
+p.put("remote.cluster."+clusterName+".clusternode.selector", MyClusterNodeSelector.class.getName());
+
+EJBClientConfiguration cc = new PropertiesBasedEJBClientConfiguration(p);
+ContextSelector<EJBClientContext> selector = new ConfigBasedEJBClientContextSelector(cc);
+EJBClientContext.setSelector(selector);
+For a scoped-context client
+
+Raw
+Properties p = new Properties();
+p.put("org.jboss.ejb.client.scoped.context", true);
+p.put(Context.URL_PKG_PREFIXES, "org.jboss.ejb.client.naming");
+p.put("remote.connections", "default");
+p.put("remote.connection.default.host", "localhost");
+p.put(.......)  // other properties
+
+final String clusterName = "ejb";
+p.put("remote.clusters", clusterName);
+p.put("remote.cluster."+clusterName+".clusternode.selector", MyClusterNodeSelector.class.getName());
+
+==========================================================================================
+==========================================================================================

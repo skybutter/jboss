@@ -1,2 +1,28 @@
 The port offset is set to 101.  The remote ejb call use 4548.
 Port 5546 was for the JMS communication between the server and the client.
+
+================================
+EJB Traffic slow over WAN
+JBoss EAP 6.2 
+It is supposed to be fixed in JBoss EAP 6.3
+
+Change the REEIVE WINDOW SIZE in ejb subsystem, need to match with the Networking line.
+Changed to 262144 or others to try.
+
+
+Server:
+    <subsystem xmlns="urn:jboss:domain:ejb3:1.4">
+        <session-bean>
+            <stateless>
+			...
+			<remote connector-ref="remoting-connector" thread-pool-name="default">
+				<channel-creation-options>
+					<option name="TRANSMIT_WINDOW_SIZE" value="819200" type="remoting"/>
+					<option name="RECEIVE_WINDOW_SIZE" value="819200" type="remoting"/>
+				</channel-creation-options>
+			</remote>
+
+Client:
+
+    connectionProperties.put("remote.connection.0.connect.options.org.jboss.remoting3.RemotingOptions.RECEIVE_WINDOW_SIZE", "819200");
+    connectionProperties.put("remote.connection.0.connect.options.org.jboss.remoting3.RemotingOptions.TRANSMIT_WINDOW_SIZE", "819200");
