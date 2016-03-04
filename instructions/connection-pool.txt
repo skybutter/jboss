@@ -1,0 +1,76 @@
+Connection pool is per datasource . If one host has multiple Jboss servers  and each JBoss servers has multiple datasources  then max pool would be specific to datasources and not server and not hosts .
+
+
+How to increase the connection pool size from the JBoss-Cli?
+===============================================================
+The CLI command for connection pool size is as follows :
+===================
+[domain@localhost:9999 /] /profile=full/subsystem=datasources/data-source=ExampleDS:write-attribute(name=max-pool-size,value=50) 
+{
+    "outcome" => "success",
+    "result" => undefined,
+    "server-groups" => {"main-server-group" => {"host" => {"master" => {
+        "server-one" => {"response" => {"outcome" => "success"}},
+        "server-two" => {"response" => {"outcome" => "success"}}
+    }}}}
+}
+
+Note: Using the CLI command , the output states success , so this wont require restart .
+===============================================================
+===============================================================
+
+How to get statistic of the connection pool from JBoss-Cli?
+===============================================================
+jboss-cli.sh --connect controller=localhost:9999  command="/host=host3/server=atp-server6/subsystem=datasources/data-source=AtpSybaseDS/statistics=pool:read-attribute(name=AvailableCount)"
+
+
+Explanation of Datasource connection pool statistics:
+
+The statistics definitions are available in the EAP 6 Administration and Configuration guide, which includes information similar to the following.
+
+ActiveCount
+The number of connections that are currently active. This includes connections that are InUse (see below) and connections that are available to be provided in the event of a new getConnection() request. (createdCount - destroyedCount)
+
+AvailableCount
+The number of connections that can currently be handed out. (maxPoolSize - inUseCount)
+
+AverageBlockingTime
+This is the average time spent waiting for a connection to be handed out from the pool (milliseconds). (totalBlockingTime / createdCount, before JBJCA-961)
+This is the average time spent waiting for a connection to be handed out from the pool(milliseconds). (totalBlockingTime / Invocations, after JBJCA-961)
+
+AverageCreationTime
+This is the average time spent creating a new connection (milliseconds). (totalCreationTime / createdCount)
+
+CreatedCount
+The number of physical connections created.
+
+DestroyedCount
+The number of physical connections destroyed.
+
+InUseCount
+The number of physical connections that are reserved by application components which have executed a getConnection() request but not yet returned the connection to the pool by calling close(). These may or may not be actively accessing the database but they are not available to be returned by new getConnection() requests. This count may include connections that have been leaked by application code which fails to close (i.e. return to the pool) connections which are no longer needed.
+
+MaxCreationTime
+The maximum time taken to create a connection (milliseconds).
+
+MaxUsedCount
+The maximum number of connections used at one time. See InUseCount.
+
+MaxWaitTime
+The maximum time spent waiting on a connection (milliseconds).
+
+TimedOut
+The number of connections which have timed out in the pool.
+
+TotalBlockingTime
+The total time spent waiting on connections (milliseconds).
+
+TotalCreationTime
+The total time spent creating connections (milliseconds).
+
+The users can check the value of above attributes via CLI.
+
+Example:
+
+Raw
+[standalone@localhost:9999 /] /subsystem=datasources/data-source=ExampleDS/statistics=pool:read-attribute(name=CreatedCount)

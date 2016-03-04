@@ -1,0 +1,98 @@
+HornetQ in JBoss EAP 6.x domain mode
+Create a Live backup server in domain mode
+
+Requirement:
+JBoss EAP 6.x running in domain mode
+You must use a shared storage for the live and backup hornetq server
+
+Modify domain.xml
+=================
+Find the either profile: full-ha or full-ha-hornetq
+Enter <cluster-user>
+Enter <cluster-password>
+Enter <shared-store>true</shared-store>
+Enter <backup>${jboss.messaging.hornetq.backup:false}</backup>
+Enter shared storage for HornetQ resources between pair of live-backup instances
+For example:
+<subsystem xmlns="urn:jboss:domain:messaging:1.3">
+    <hornetq-server>
+        <persistence-enabled>true</persistence-enabled>
+        <cluster-user>admin</cluster-user>
+        <cluster-password>${jboss.messaging.cluster.password:adminPassword}</cluster-password>
+        <shared-store>true</shared-store>
+        <backup>${jboss.messaging.hornetq.backup:false}</backup>                
+        <!-- Enable the following block if you want to failover on normal server shutdown -->
+        <!-- <failover-on-shutdown>true</failover-on-shutdown> -->
+        ...(snip)...
+        <!-- Specify shared storage for HornetQ resources between pair of live-backup instances -->
+        <paging-directory path="hornetq/paging" relative-to="hornetq.dir"/>
+        <bindings-directory path="hornetq/bindings" relative-to="hornetq.dir"/>
+        <journal-directory path="hornetq/journal" relative-to="hornetq.dir"/>
+        <large-messages-directory path="hornetq/large-messages" relative-to="hornetq.dir"/>
+        ...(snip)...
+======
+Note:
+The above "hornetq.dir" value in relative-to attibute need be configured in path setting. In this case, we specify it in <server> setting in host.xml.
+The system property jboss.messaging.hornetq.backup is used to change whether server instance become backup or not. In this case, we specify the system property in <server> setting in host.xml.
+If you created new profile full-ha-hornetq, map your server-group to the new profile. For example:
+
+Raw
+<server-group name="hornetq-server-group" profile="full-ha-hornetq">
+    ...(snip)...
+    <socket-binding-group ref="full-ha-sockets"/>
+</server-group>
+
+Modify host*.xml
+================
+Configure server instances:
+
+Add path setting to point shared storage for HornetQ resources between pair of live-backup nodes
+Specify the system property jboss.messaging.hornetq.backup to true on backup server instances
+For example:
+<!-- server1-live1 and server2-backup1 are pair of live-backup -->
+<server name="server1-live1" group="hornetq-server-group" auto-start="true">
+    <paths>
+        <path name="hornetq.dir" path="/path/to/shared_dir/domain-hornetq1"/>
+    </paths>
+    ...(snip)...
+</server>
+<server name="server2-backup1" group="hornetq-server-group" auto-start="true">
+    <system-properties>
+        <property name="jboss.messaging.hornetq.backup" value="true"/>
+    </system-properties>
+    <paths>
+        <path name="hornetq.dir" path="/path/to/shared_dir/domain-hornetq1"/>
+    </paths>
+    ...(snip)...
+    <socket-bindings port-offset="150"/>
+</server>
+
+<!-- server3-live2 and server4-backup2 are another pair of live-backup -->
+<server name="server3-live2" group="hornetq-server-group" auto-start="true">
+    <paths>
+        <path name="hornetq.dir" path="/path/to/shared_dir/domain-hornetq2"/>
+    </paths>
+    ...(snip)...
+    <socket-bindings port-offset="300"/>
+</server>
+<server name="server4-backup2" group="hornetq-server-group" auto-start="true">
+    <system-properties>
+        <property name="jboss.messaging.hornetq.backup" value="true"/>
+    </system-properties>
+    <paths>
+        <path name="hornetq.dir" path="/path/to/shared_dir/domain-hornetq2"/>
+    </paths>
+    ...(snip)...
+    <socket-bindings port-offset="450"/>
+</server>
+
+see zip file with same name for the sample domain.xml and host.xml.
+
+Example output log:
+=========================
+When server startup:
+INFO  [org.hornetq.core.server.cluster.impl.ClusterConnectionImpl] (Thread-0 (HornetQ-server-HornetQServerImpl::serverUUID=fc476a29-0bb9-11e2-a94c-25850778a8f8-17143881)) backup announced
+
+When Backup goes live:
+INFO  [org.hornetq.core.server.impl.HornetQServerImpl] (Activation for server HornetQServerImpl::serverUUID=fc476a29-0bb9-11e2-a94c-25850778a8f8) Backup Server is now live
+

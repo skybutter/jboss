@@ -1,0 +1,41 @@
+To validate Sybase data source connection everytime getting a connection to use.
+
+Modify domain.xml datasource section
+
+Add the following:
+
+<subsystem xmlns="urn:jboss:domain:datasources:1.2">
+    <datasources>
+        <datasource jndi-name="java:jboss/datasources/<data-source-name>" pool-name="<data-source-name>" enabled="true" use-java-context="true" use-ccm="true" statistics-enabled="true">
+		...
+			<validation>
+				<valid-connection-checker class-name="org.jboss.jca.adapters.jdbc.extensions.sybase.SybaseValidConnectionChecker" />
+				<validate-on-match>true</validate-on-match>
+				<background-validation>false</background-validation>
+				<use-fast-fail>false</use-fast-fail>
+				<exception-sorter class-name="org.jboss.jca.adapters.jdbc.extensions.sybase.SybaseExceptionSorter" />
+			</validation>
+
+
+See also:
+https://access.redhat.com/solutions/156103
+
+
+List of Validation Checker:
+org.jboss.jca.adapters.jdbc.extensions.db2.DB2ValidConnectionChecker
+org.jboss.jca.adapters.jdbc.extensions.novendor.JDBC4ValidConnectionChecker
+org.jboss.jca.adapters.jdbc.extensions.mssql.MSSQLValidConnectionChecker
+org.jboss.jca.adapters.jdbc.extensions.mysql.MySQLValidConnectionChecker
+org.jboss.jca.adapters.jdbc.extensions.mysql.MySQLReplicationValidConnectionChecker
+org.jboss.jca.adapters.jdbc.extensions.oracle.OracleValidConnectionChecker
+org.jboss.jca.adapters.jdbc.extensions.postgres.PostgreSQLValidConnectionChecker
+org.jboss.jca.adapters.jdbc.extensions.sybase.SybaseValidConnectionChecker
+
+List of Exception sorter:
+org.jboss.jca.adapters.jdbc.extensions.db2.DB2ExceptionSorter
+org.jboss.jca.adapters.jdbc.extensions.mssql.MSSQLExceptionSorter (EAP 6.4 and later only)
+org.jboss.jca.adapters.jdbc.extensions.mysql.MySQLExceptionSorter
+org.jboss.jca.adapters.jdbc.extensions.oracle.OracleExceptionSorter
+org.jboss.jca.adapters.jdbc.extensions.postgres.PostgreSQLExceptionSorter
+org.jboss.jca.adapters.jdbc.extensions.sybase.SybaseExceptionSorter
+

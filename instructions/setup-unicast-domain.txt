@@ -1,0 +1,127 @@
+=============================================================================================================
+If you use TCP protocol for jgroup clustering then server wont multicase packages in network.
+To switch tcp communication instead of multicast mode for jgroup clustering please refer link[1].
+[1] https://access.redhat.com/site/solutions/140103
+=============================================================================================================
+In domain.xml:
+Find the profile ha or full-ha.
+Replace default-stack=”udp” to default-stack=”tcp” in the subsystem element
+As following:
+Find jgroups
+<subsystem xmlns="urn:jboss:domain:jgroups:1.1" default-stack="udp"> 
+Change "udp" to "tcp":
+<subsystem xmlns="urn:jboss:domain:jgroups:1.1" default-stack="tcp">
+
+And add the following “TCPPING” protocol element with its sub-elements, which would be having the IP address of both the boxes. Make sure you comment or replace "MPING" with "TCPPING"
+
+<subsystem xmlns="urn:jboss:domain:jgroups:1.1" default-stack="tcp">
+            <stack name="udp">
+           .. ..
+            </stack>
+            <stack name="tcp">
+                <transport type="TCP" socket-binding="jgroups-tcp"/>
+                <protocol type="TCPPING">
+                    <property name="initial_hosts">10.11.12.12[7600],10.11.12.13[7600]</property>
+                    <property name="num_initial_members">2</property>
+                    <property name="port_range">0</property>
+                    <property name="timeout">2000</property>
+                </protocol>
+                <!--<protocol type="MPING" socket-binding="jgroups-mping"/>-->
+                <protocol type="MERGE2"/>
+                <protocol type="FD_SOCK" socket-binding="jgroups-tcp-fd"/>
+                <protocol type="FD"/>
+                <protocol type="VERIFY_SUSPECT"/>
+                <protocol type="BARRIER"/>
+                <protocol type="pbcast.NAKACK"/>
+                <protocol type="UNICAST2"/>
+                <protocol type="pbcast.STABLE"/>
+                <protocol type="pbcast.GMS"/>
+                <protocol type="UFC"/>
+                <protocol type="MFC"/>
+                <protocol type="FRAG2"/>
+                <protocol type="RSVP"/>
+            </stack>
+        </subsystem>
+
+Possible to use the following if your use variable substitution:
+domain.xml
+				<protocol type="TCPPING">
+                    <property name="initial_hosts">${jboss.cluster.tcp.initial_hosts}</property>
+                    ...
+host*.xml
+    <server-groups>
+        <server-group name="a-server-group" profile="ha">
+            <socket-binding-group ref="ha-sockets"/>
+            <system-properties>
+              <property name="jboss.cluster.tcp.initial_hosts" value="10.10.10.10[7600],20.20.20.20[7600]" />
+            </system-properties>
+			
+Notes:
+
+It is recommended to use all servers within the initial_hosts and set it for all hosts nevetheless whether standalone or domain is used. This prevent from clustering issues.
+Make sure that the cluster instances are bound to the IP addresses specified in initial_hosts.
+If binding instances to 0.0.0.0, make sure to specify a jgroups.bind_addr (the same as addresses specified in initial_hosts).
+Make sure port_range is set to 0 (defaults to 1). In some circumstances, not specifying port_range can cause intercluster communication.
+It is recommended that num_initial_members be equal to the cluster size, but at least greater that 1/2 the cluster size.
+
+=============================================================================================================
+=============================================================================================================
+To switch tcp communication instead of multicast mode for HornetQ clustering please refer link[2].
+[2] https://access.redhat.com/site/solutions/293823
+=============================================================================================================
+Take the default standalone-full-ha.xml shipped with JBoss EAP 6 as an example.
+Remove the broadcast-groups and discovery-groups:
+<broadcast-groups>
+    <broadcast-group name="bg-group1">
+        <socket-binding>messaging-group</socket-binding>
+        <broadcast-period>5000</broadcast-period>
+        <connector-ref>netty</connector-ref>
+    </broadcast-group>
+</broadcast-groups>
+<discovery-groups>
+    <discovery-group name="dg-group1">
+        <socket-binding>messaging-group</socket-binding>
+        <refresh-timeout>10000</refresh-timeout>
+    </discovery-group>
+</discovery-groups>
+
+Optionally remove the messaging-group socket-binding:
+<socket-binding name="messaging-group" port="0" multicast-address="${jboss.messaging.group.address:231.7.7.7}" multicast-port="${jboss.messaging.group.port:9876}"/>
+
+Configure the appropriate Netty connector(s) - one for each of the other nodes in the cluster. For example, if the cluster is 3 nodes then configure 2 Netty connectors, etc., if the cluster is 2 nodes then configure 1 Netty connector, etc. Here is a sample configuration for a 3-node cluster:
+<netty-connector name="other-cluster-node1" socket-binding="other-cluster-node1"/>
+<netty-connector name="other-cluster-node2" socket-binding="other-cluster-node2"/>
+
+Configure the related socket-bindings. Note: System property substitution can be used for either "host" or "port" if desired.
+<outbound-socket-binding name="other-cluster-node1">
+    <remote-destination host="otherNodeHostName1" port="5445"/>
+</outbound-socket-binding>
+<outbound-socket-binding name="other-cluster-node2">
+    <remote-destination host="otherNodeHostName2" port="5445"/>
+</outbound-socket-binding>
+
+Configure the cluster-connection to use these connectors instead of the discovery-group which it uses by default:
+<cluster-connection name="my-cluster">
+    <address>jms</address>
+    <connector-ref>netty</connector-ref>
+    <static-connectors>
+        <connector-ref>other-cluster-node1</connector-ref>
+        <connector-ref>other-cluster-node2</connector-ref>
+    </static-connectors>
+</cluster-connection>
+
+If adding/updating/removing any static-connectors via CLI then the server reload will be required to effect the changes made.
+This process would need to be done on each of the cluster nodes so that each node has connectors to every other node in the cluster.
+
+Note: Do not configure a node with a connection to itself. This is considered a misconfiguration.
+
+Note: For EAP 6.1.0 and later (HornetQ 2.3.x), an alternative would be to use JGroups for discovery and to configure the JGroups stack for TCP. For more information see How to use JGroups clustering for HornetQ in EAP 6.1?.
+
+=============================================================================================================
+To configure mod_cluster Subsystem to Use TCP please refer link[3]
+If you are using hardware load balancer then no need to change mod_cluster subsystem (not using apache).
+https://access.redhat.com/site/documentation/en-US/JBoss_Enterprise_Application_Platform/6/html/Administration_and_Configuration_Guide/Configure_the_mod_cluster_Subsystem_to_Use_TCP.html
+
+
+
+

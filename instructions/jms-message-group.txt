@@ -1,0 +1,130 @@
+How to do JMS message group in EAP 6?
+==========================================================
+Environment: 
+JBoss EAP 6.x, domain mode, cluster 3 hosts
+
+Description:
+=================
+All nodes run the same application EAR.  It publishes message on a JMS queue.  The queue has an MDB for processing the message.  We like to keep the JMS message order processing in sequeunce.  Meaning the message should be process one at a time and one after another, not concurrently.  Currently, messages on the queue are processed by the MDB running on multiple nodes at the same time.
+
+Solution:
+=================
+To achieve message grouping, you need to configure both message sender and the server[1]. Here's how to configure the message sender if you're using plain JMS : 
+
+
+ // send 2 messages in the same group to ensure the same
+ // consumer will receive both
+ Message message = ...
+ message.setStringProperty("JMSXGroupID", "Group-0");
+ producer.send(message);
+
+ message = ...
+ message.setStringProperty("JMSXGroupID", "Group-0");
+ producer.send(message);
+
+
+Alternatively, you could configure the connection factory with "auto-group" attribute to generate and assign a group id automatically. Here's the connection factory configuration :
+
+
+                <connection-factory name="RemoteConnectionFactory">
+                        <discovery-group-ref discovery-group-name="dg-group1"/>
+                        <entries>
+                            <entry name="java:jboss/exported/jms/RemoteConnectionFactory"/>
+                        </entries>
+                        <ha>true</ha>
+                        <block-on-acknowledge>true</block-on-acknowledge>
+                        <retry-interval>1000</retry-interval>
+                        <retry-interval-multiplier>1.0</retry-interval-multiplier>
+                        <reconnect-attempts>-1</reconnect-attempts>
+                        <auto-group>true</auto-group> <!-- HERE -->
+                    </connection-factory>
+
+On the JMS broker, you need to configure a "grouping-handler" to support message grouping in a clustered environment. Please configure one node with a 'LOCAL' handler and all other nodes with 'REMOTE' handlers. 
+
+                <grouping-handler name="my-grouping-handler">
+                    <type>LOCAL</type>
+                    <address>jms</address>
+                    <timeout>5000</timeout>
+                </grouping-handler>
+
+
+REMOTE handler configuration :
+               <grouping-handler name="my-grouping-handler">
+                  <type>REMOTE</type>
+                  <address>jms</address>
+                  <timeout>5000</timeout>
+               </grouping-handler>
+
+
+http://docs.jboss.org/hornetq/2.3.0.Final/docs/user-manual/html_single/index.html#message-grouping
+
+Please open domain.xml file locate the messaging (HornetQ) subsystem under "full-ha" profile. I would place "grouping-handler" configuration between "cluster-connections" and "security-settings" as follows :
+
+
+<hornetq-server>
+....
+....
+               <cluster-connections>
+                    <cluster-connection name="my-cluster">
+                        <address>jms</address>
+                        <connector-ref>netty</connector-ref>
+                        <discovery-group-ref discovery-group-name="dg-group1"/>
+                    </cluster-connection>
+                </cluster-connections>
+                <grouping-handler name="my-grouping-handler">
+                    <type>LOCAL</type>
+                    <address>jms</address>
+                    <timeout>5000</timeout>
+                </grouping-handler>
+                <security-settings>
+                    <security-setting match="#">
+                        <permission type="send" roles="guest"/>
+                        <permission type="consume" roles="guest"/>
+                        <permission type="createNonDurableQueue" roles="guest"/>
+                        <permission type="deleteNonDurableQueue" roles="guest"/>
+                    </security-setting>
+                </security-settings>
+                <address-settings>
+....
+....
+</hornetq-server>
+
+If the local handler server node goes down while the rest of the node is still up?
+
+The grouped messages would not be processed. You need to configure a backup node for the local handler to address this situation. Here's what the document says :
+
+<snip>
+You may have noticed that there is a single point of failure with the single local handler. If this node crashes then no decisions will be able to be made. Any messages sent will be not be delivered and an exception thrown. To avoid this happening Local Handlers can be replicated on another backup node. Simple create your back up node and configure it with the same Local handler.
+</snip>
+
+
+To setup a local handler backup to avoid single point of failure:
+===================================================================
+You have to create a backup server instance, to take over the "local" grouping handler when the live server goes offline. Let me explain this to you in detail. 
+
+When you configure messaging grouping in a cluster, the local grouping handler makes decisions on routing messages. When the node hosting local group handler goes offline, the grouped messages won't get distributed as expected. Therefore, you need to have a backup server instance to host the local grouping handler. In other words, you have to configure the local grouping handler in a live/backup pair[1].
+
+
+------------
+| node1-1  |
+| Local H  |
+| backup   |
+------------
+     |
+     |
+     |
+------------          ------------         ------------
+| node1    |          |node 2    |         | node 3   |
+| Local H  |----------|remote    |---------| remote   |
+| live     |          |handler   |         | handler  |
+------------          ------------         ------------
+
+
+
+The above diagram represents the proposed configuration.
+
+
+[1] https://access.redhat.com/site/solutions/239013
+See other file for HornetQ Live Backup Configuration in domain mode.
+
+
