@@ -43,11 +43,31 @@ jboss-cli.sh -c controller=atpappqa1:9001 /host=host1/server=<jboss-server1>/sub
 
 jboss-cli.sh -c controller=atpappqa1:9001 /host=host1/server=<jboss-server1>/subsystem=datasources/data-source=<your-datasource>/:flush-idle-connection-in-pool
 
-*****************************
-** Apply Patch 
+#*****************************
+#** Apply Patch 
+#** JBoss - no need to have running instance
+# Set JBOSS_HOME
+export JBOSS_HOME=/var/jboss/jboss-eap-6.4
 ./bin/jboss-cli.sh "patch apply <path-to-jboss-patch-file>/jboss-eap-6.3.1-patch.zip"
 
+## Windows - apply patch
 set JBOSS_HOME=c:\jboss-eap-6.4
 cd jboss-eap-6.4
-./bin/jboss-cli.sh "patch apply <path-to-jboss-patch-file>/jboss-eap-6.4.6-patch.zip"
-************************************
+.\bin\jboss-cli.sh "patch apply <path-to-jboss-patch-file>\jboss-eap-6.4.6-patch.zip"
+#************************************
+
+# ******************************************************************************************************
+# Deploying application in JBoss domain mode
+# ******************************************************************************************************
+When deploying an application in domain mode, it can be deployed only by using the management interface (i.e. JBoss CLI or Management GUI). 
+For a quicker shorthand approach to using the CLI, one could do something like such:
+
+./jboss-cli.sh -c --controller=192.168.1.9:9999 --user=jboss --password=redhat1! --command="SOME-COMMAND"
+
+The above would allow one to execute a single operation/command one time from the command line. 
+So, to deploy an application, your command may look like such:
+
+./jboss-cli.sh -c --controller=192.168.1.9:9999 --user=jboss --password=redhat1! --command="deploy /home/jboss/Desktop/apps/my-app.war --all-server-groups"
+
+One could also use custom CLI scripts for repetitive tasks. The other alternative outside the CLI or Management GUI would be custom code. If desired on could write Java (or Groovy, Jython, etc) programs that carry out desired management tasks.
+# ******************************************************************************************************
