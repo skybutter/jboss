@@ -1,0 +1,2 @@
+The port offset is set to 101.  The remote ejb call use 4548.
+Port 5546 was for the JMS communication between the server and the client.
