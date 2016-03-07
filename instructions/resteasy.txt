@@ -1,0 +1,8 @@
+This describe how to implement RESTful Web service call in JBoss EAP 6.x or JBoss AS 7
+1.  Create Java class WebServiceRegister.java to register the Web service implementation.  see resteasy-WebServiceRegister.java
+2.  Create Java class WhateverWebService.java to implement the Web Service and its dependent class (Soccer.java).  See resteasy-WhateverWebService.java
+3.  Modify web.xml to load the WebServiceRegister class.  see resteasy-web.xml
+4.  Modify maven pom.xml to add resteasy dependency.
+========================================================================================
+========================================================================================
+

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+   xmlns="http://java.sun.com/xml/ns/javaee" xmlns:web="http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd"
+   xsi:schemaLocation="http://java.sun.com/xml/ns/javaee
+http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd"
+   id="ATP" version="2.5">
+	<!-- Rest Easy Example - web.xml -->
+      <display-name>App Name</display-name>
+      <description>Web Application Description</description>
+<!--	Use to default the web services path
+      <context-param>
+         <param-name>resteasy.servlet.mapping.prefix</param-name>
+         <param-value>/webservices</param-value>
+      </context-param>
+-->
+     <servlet>
+         <servlet-name>resteasy-servlet</servlet-name>
+         <servlet-class>org.jboss.resteasy.plugins.server.servlet.HttpServletDispatcher</servlet-class>
+         <init-param>
+            <param-name>resteasy.servlet.mapping.prefix</param-name>
+            <param-value>/rest</param-value>
+         </init-param>
+         <!-- 1st method - Loading the Web Service class directly.  
+				No need to create the WebServiceRegister class using this method.
+			Somehow this way is not working with JBoss.  May have something to do with using multiple HttpServletDispatcher, not sure.
+         <init-param>
+            <param-name>resteasy.resources</param-name>
+            <param-value>rest.ws.WhateverWebService</param-value>
+         </init-param>
+          -->
+		  <!-- 2nd method Using a separate java class to register the Web Service -->
+         <init-param>
+            <param-name>javax.ws.rs.Application</param-name>
+            <param-value>rest.ws.WebServiceRegister</param-value>
+         </init-param>
+         <load-on-startup>1</load-on-startup>
+      </servlet>
+      <servlet-mapping>
+         <servlet-name>resteasy-servlet</servlet-name>
+         <url-pattern>/rest/*</url-pattern>
+      </servlet-mapping>
+   </web-app>
