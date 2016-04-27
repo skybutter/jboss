@@ -1,0 +1,125 @@
+<!-- Test project which creates and signs a jar artifact -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+   <parent>
+      <groupId>sb.mvn.moduleA</groupId>
+      <artifactId>moduleA</artifactId>
+      <version>6.7.3-SNAPSHOT</version>
+   </parent>
+   
+   <modelVersion>4.0.0</modelVersion>
+   <artifactId>client</artifactId>
+   <packaging>jar</packaging>
+   <name>client</name>
+   <description>client</description>
+
+   <dependencies>
+      <dependency>
+         <groupId>sb.mvn.moduleA</groupId>
+         <artifactId>common</artifactId>
+         <version>${project.version}</version>
+      </dependency>
+      <dependency>
+         <groupId>sb.mvn.module-fmk</groupId>
+         <artifactId>client</artifactId>
+         <version>${version.sb-module-fmk}</version>
+         <scope>provided</scope>
+      </dependency>
+      <dependency>
+         <groupId>sb.mvn.module-fmk</groupId>
+         <artifactId>common</artifactId>
+         <version>${version.sb-module-fmk}</version>
+         <scope>provided</scope>
+      </dependency>
+      <dependency>
+         <groupId>org.jboss.spec.javax.ejb</groupId>
+         <artifactId>jboss-ejb-api_3.1_spec</artifactId>
+         <scope>provided</scope>
+      </dependency>
+      <dependency>
+         <groupId>org.jboss</groupId>
+         <artifactId>jboss-ejb-client</artifactId>
+         <scope>provided</scope>
+      </dependency>
+      <dependency>
+         <groupId>junit</groupId>
+         <artifactId>junit</artifactId>
+         <scope>test</scope>
+      </dependency>
+      <dependency>
+         <groupId>org.mockito</groupId>
+         <artifactId>mockito-all</artifactId>
+         <scope>test</scope>
+      </dependency>
+      <dependency>
+            <groupId>org.powermock</groupId>
+            <artifactId>powermock-mockito-release-full</artifactId>
+            <scope>test</scope>
+            <type>pom</type>
+      </dependency>
+   </dependencies>
+
+   <build>
+      <finalName>${project.artifactId}</finalName>
+      <plugins>
+         <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>webstart-maven-plugin</artifactId>
+            <executions>
+               <execution>
+                  <phase>package</phase>
+                  <goals>
+                     <goal>jnlp-inline</goal>
+                  </goals>
+               </execution>
+            </executions>
+            <configuration>
+               <libPath>webstart</libPath>
+               <!-- Generate a dummy jnlp file, not able to disable plugin generating jnlp -->
+               <jnlp>
+                  <!-- <inputTemplateResourcePath>${project.basedir}/src/main</inputTemplateResourcePath>
+                  <inputTemplate>jnlp/template-jsp.vm</inputTemplate> -->
+                  <outputFile>dummy.jsp</outputFile>
+                  <mainClass>sb.mvn.moduleA.client.HelloWorldSwing</mainClass>
+               </jnlp>
+               <!-- SIGNING -->
+               <!-- defining this will automatically sign the jar and its 
+                  dependencies -->
+               <sign>
+                  <keystore>${basedir}/my.keystore</keystore>
+                  <alias>myAlias</alias>
+                  <storepass>myStorePass</storepass>
+                  <keypass>myKeyPass</keypass>
+                  <verify>true</verify>
+               </sign>
+               <verbose>true</verbose>
+               <updateManifestEntries>
+                  <Permissions>all-permissions</Permissions>
+                  <Codebase>*</Codebase>
+               </updateManifestEntries>
+            </configuration>
+         </plugin>
+         <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <executions>
+               <execution>
+                  <id>attach-sources</id>
+                  <goals>
+                     <goal>jar-no-fork</goal>
+                  </goals>
+               </execution>
+            </executions>
+         </plugin>
+      </plugins>
+   </build>
+
+   <distributionManagement>
+      <site>
+         <id>SB-site</id>
+         <name>SB Maven Site</name>
+         <url>${sb.mavenSite.url}/${project.parent.artifactId}/${project.version}/${project.artifactId}</url>
+      </site>
+   </distributionManagement>
+</project>
+		

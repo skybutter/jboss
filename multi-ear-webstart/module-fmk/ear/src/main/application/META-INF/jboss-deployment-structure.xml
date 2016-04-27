@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jboss-deployment-structure>
+  <!-- By default, we'll make all artifacts in this ear visible to each other by setting isolation to false -->
+  <ear-subdeployments-isolated>false</ear-subdeployments-isolated>
+  <deployment>
+    <dependencies> 
+      <module name="com.sybase" export="true" />
+      <module name="org.apache.cxf" export="true" />
+      <module name="org.apache.cxf.impl" export="true" />
+      <module name="org.apache.httpcomponents" export="true" />
+      <module name="javax.transaction.api" export="true" />
+      <module name="javax.ejb.api" export="true" />
+      <module name="javax.servlet.api" export="true" />
+      <module name="javax.jms.api" export="true" />
+      <module name="org.jboss.ejb-client" export="true" />
+      <module name="org.jboss.logging" export="true" />
+      <module name="org.apache.commons.collections" export="true" />
+    </dependencies> 
+  </deployment>
+</jboss-deployment-structure>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+   <parent>
+      <groupId>sb.mvn</groupId>
+      <artifactId>parentpom</artifactId>
+      <version>6.7.3-SNAPSHOT</version>
+   </parent>
+   
+   <name>moduleA</name>
+   <modelVersion>4.0.0</modelVersion>
+   <groupId>sb.mvn.moduleA</groupId>
+   <artifactId>moduleA</artifactId>
+   <packaging>pom</packaging>
+
+   <modules>
+      <module>common</module>
+      <module>client</module>
+      <module>server</module>
+      <module>web</module>
+      <module>ear</module>
+   </modules>
+
+   <scm>
+      <developerConnection>scm:svn:http://${sb.svn.server}/svn/dept/moduleA/trunk/</developerConnection>
+      <connection>scm:svn:http://${sb.svn.server}/svn/dept/moduleA/trunk</connection>
+      <url>http://${sb.svn.server}/svn/dept/moduleA/trunk</url>
+   </scm>
+
+   <distributionManagement>
+      <site>
+         <id>SB-site</id>
+         <name>SB Maven Site</name>
+		 <url>${sb.mavenSite.url}/${project.artifactId}/${project.version}</url>
+      </site>
+   </distributionManagement>
+
+   <developers>
+      <developer>
+         <id>skybutter</id>
+         <name>Sky Butter</name>
+         <email>skybutter@gmail.com</email>
+         <timezone>-8</timezone>
+      </developer>
+   </developers>
+</project>

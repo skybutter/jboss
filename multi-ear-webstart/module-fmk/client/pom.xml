@@ -1,0 +1,261 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <modelVersion>4.0.0</modelVersion>
+
+   <parent>
+      <groupId>sb.mvn.module-fmk</groupId>
+      <artifactId>module-fmk</artifactId>
+      <version>6.7.3-SNAPSHOT</version>
+   </parent>
+
+   <artifactId>client</artifactId>
+   <packaging>jar</packaging>
+   <name>client</name>
+
+    <profiles>
+        <profile>
+            <id>test</id>
+            <dependencies>
+                <dependency>
+                    <groupId>sb.mvn.module-fmk</groupId>
+                    <artifactId>common</artifactId>
+                    <version>${version.sb-mvn-module-fmk}</version>
+                    <type>test-jar</type>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
+    
+   <dependencies>
+      <dependency>
+         <groupId>sb.mvn.module-fmk</groupId>
+         <artifactId>common</artifactId>
+         <version>${project.version}</version>
+      </dependency>
+
+      <dependency>
+         <groupId>org.apache.httpcomponents</groupId>
+         <artifactId>httpclient</artifactId>
+      </dependency>
+
+      <dependency>
+         <groupId>org.apache.httpcomponents</groupId>
+         <artifactId>httpcore</artifactId>
+      </dependency>
+
+      <dependency>
+         <groupId>com.google.code.gson</groupId>
+         <artifactId>gson</artifactId>
+         <version>2.2.4</version>
+      </dependency>
+
+      <dependency>
+         <groupId>org.slf4j</groupId>
+         <artifactId>slf4j-jdk14</artifactId>
+      </dependency>
+
+      <dependency>
+         <groupId>javax.jnlp</groupId>
+         <artifactId>jnlp-api</artifactId>
+         <version>${version.wam.java}</version>
+         <scope>system</scope>
+         <systemPath>${java.home}/lib/javaws.jar</systemPath>
+      </dependency>
+
+      <dependency>
+         <groupId>javax</groupId>
+         <artifactId>plugin</artifactId>
+         <version>${version.wam.java}</version>
+         <scope>system</scope>
+         <systemPath>${java.home}/lib/plugin.jar</systemPath>
+      </dependency>
+      <dependency>
+         <groupId>net.java.dev.jna</groupId>
+         <artifactId>jna-platform</artifactId>
+         <version>4.1.0</version>
+      </dependency>
+      <dependency>
+         <groupId>commons-logging</groupId>
+         <artifactId>commons-logging</artifactId>
+         <version>1.0</version>
+      </dependency>
+
+      <dependency>
+         <groupId>com.jidesoft</groupId>
+         <artifactId>jide-data</artifactId>
+      </dependency>
+
+      <dependency>
+         <groupId>com.jidesoft</groupId>
+         <artifactId>jide-grids</artifactId>
+      </dependency>
+
+      <dependency>
+         <groupId>com.jidesoft</groupId>
+         <artifactId>jide-components</artifactId>
+      </dependency>
+
+      <dependency>
+         <groupId>com.jidesoft</groupId>
+         <artifactId>jide-common</artifactId>
+      </dependency>
+      <dependency>
+         <groupId>commons-collections</groupId>
+         <artifactId>commons-collections</artifactId>
+      </dependency>
+
+      <dependency>
+         <groupId>org.apache.poi</groupId>
+         <artifactId>poi-ooxml</artifactId>
+      </dependency>
+      <dependency>
+         <groupId>org.apache.xmlbeans</groupId>
+         <artifactId>xmlbeans</artifactId>
+      </dependency>
+      <dependency>
+         <groupId>org.jdom</groupId>
+         <artifactId>jdom</artifactId>
+      </dependency>
+
+      <dependency>
+         <groupId>org.jboss.resteasy</groupId>
+         <artifactId>resteasy-jaxrs</artifactId>
+         <exclusions>
+            <exclusion>
+               <artifactId>jsr250-api</artifactId>
+               <groupId>javax.annotation</groupId>
+            </exclusion>
+            <exclusion>
+               <artifactId>scannotation</artifactId>
+               <groupId>org.scannotation</groupId>
+            </exclusion>
+            <exclusion>
+               <artifactId>activation</artifactId>
+               <groupId>javax.activation</groupId>
+            </exclusion>
+         </exclusions>
+      </dependency>
+      <dependency>
+         <groupId>org.jboss.spec.javax.ws.rs</groupId>
+         <artifactId>jboss-jaxrs-api_1.1_spec</artifactId>
+      </dependency>
+
+      <!-- Replacing jboss-client.jar with the following (see dependency 
+         management - BEGIN -->
+      <dependency>
+         <groupId>org.jboss.as</groupId>
+         <artifactId>jboss-as-jms-client-bom</artifactId>
+         <type>pom</type>
+      </dependency>
+      <dependency>
+         <groupId>org.jboss.as</groupId>
+         <artifactId>jboss-as-ejb-client-bom</artifactId>
+         <type>pom</type>
+      </dependency>
+      <!-- Replacing jboss-client.jar with the following - END -->
+      <dependency>
+         <groupId>junit</groupId>
+         <artifactId>junit</artifactId>
+         <scope>test</scope>
+      </dependency>
+      <dependency>
+         <groupId>org.powermock</groupId>
+         <artifactId>powermock-mockito-release-full</artifactId>
+         <scope>test</scope>
+         <type>pom</type>
+      </dependency>
+
+   </dependencies>
+
+   <build>
+      <finalName>${project.artifactId}</finalName>
+      <plugins>
+         <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>webstart-maven-plugin</artifactId>
+            <executions>
+               <execution>
+                  <id>package</id>
+                  <phase>package</phase>
+                  <goals>
+                     <goal>jnlp-inline</goal>
+                  </goals>
+               </execution>
+            </executions>
+            <configuration>
+               <libPath>webstart</libPath>
+               <updateManifestEntries>
+                  <Trusted-Only>true</Trusted-Only>
+                  <Permissions>all-permissions</Permissions>
+                  <Codebase>*</Codebase>
+               </updateManifestEntries>
+               <jnlp>
+                  <outputFile>atp.jsp</outputFile>
+                  <mainClass>sb.mvn.app.framework.client.ApplicationMain</mainClass>
+               </jnlp>
+               <sign>
+                  <keystore>${basedir}/my.keystore</keystore>
+                  <alias>myAlias</alias>
+                  <storepass>myStorePass</storepass>
+                  <keypass>myKeyPass</keypass>
+                  <verify>true</verify>
+               </sign>
+               <verbose>true</verbose>
+               <gzip>true</gzip>
+            </configuration>
+         </plugin>
+         <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <executions>
+               <execution>
+                  <id>attach-sources</id>
+                  <goals>
+                     <goal>jar-no-fork</goal>
+                  </goals>
+               </execution>
+            </executions>
+         </plugin>
+         <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-jar-plugin</artifactId>
+            <executions>
+                <execution>
+                    <goals>
+                        <goal>test-jar</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>         
+      </plugins>
+   </build>
+
+   <dependencyManagement>
+      <dependencies>
+         <!-- For Remote EJB/JMS client - BEGIN -->
+         <dependency>
+            <groupId>org.jboss.spec</groupId>
+            <artifactId>jboss-javaee-6.0</artifactId>
+            <version>3.0.2.Final-redhat-13</version>
+            <type>pom</type>
+            <scope>import</scope>
+         </dependency>
+         <dependency>
+            <groupId>org.jboss.as</groupId>
+            <artifactId>jboss-as-ejb-client-bom</artifactId>
+            <version>${version.jboss.as}</version>
+            <type>pom</type>
+            <scope>import</scope>
+         </dependency>
+         <!-- For Remote EJB/JMS client - BEGIN -->
+      </dependencies>
+   </dependencyManagement>
+   <distributionManagement>
+      <site>
+         <id>SB-site</id>
+         <name>SB Maven Site</name>
+         <url>${sb.mavenSite.url}/${project.parent.artifactId}/${project.version}/${project.artifactId}</url>
+      </site>
+   </distributionManagement>
+</project>

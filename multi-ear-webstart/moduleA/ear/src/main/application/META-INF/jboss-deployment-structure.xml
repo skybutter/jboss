@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jboss-deployment-structure>
+  <!-- By default, we'll make all artifacts in this ear visible to each other by setting isolation to false -->
+  <ear-subdeployments-isolated>false</ear-subdeployments-isolated>
+  <deployment>
+    <dependencies> 
+      <module name="deployment.module-fmk.ear" export="true"/>
+      <module name="deployment.module-fmk.ear.server.jar" export="true" />
+      <module name="com.sybase" export="true" />
+    </dependencies> 
+  </deployment>
+  <sub-deployment name="moduleA-web.war">
+   	<dependencies>
+   	  <module name="deployment.module-fmk.ear.server.jar" export="true"/>
+   	  <module name="deployment.moduleA.ear.server.jar" export="true"/>
+   	  <!-- GDR App BEGIN -->
+   	  <module name="org.codehaus.jackson.jackson-core-asl" annotations="true"/>
+   	  <module name="org.codehaus.jackson.jackson-mapper-asl" annotations="true"/>
+   	  <module name="org.codehaus.jackson.jackson-xc" annotations="true"/>
+   	  <!-- GDR App END -->   	  
+    </dependencies>
+   </sub-deployment>
+   <sub-deployment name="server.jar">
+   	<dependencies>
+   	  <module name="deployment.module-fmk.ear.server.jar" export="true"/>
+   	  <module name="org.jboss.resteasy.resteasy-jaxrs" export="true" />
+   	  <module name="org.apache.httpcomponents" services="export" export="true"/>
+    </dependencies>
+   </sub-deployment>
+</jboss-deployment-structure>

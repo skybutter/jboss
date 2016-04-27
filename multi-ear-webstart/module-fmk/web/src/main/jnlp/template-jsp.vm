@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<%@ page language="java" contentType="application/x-java-jnlp-file"%>
+<%!
+public static final String childapp = "/framework-web";
+public static final String jnlpResourcePath = "webstart/";
+public static java.util.Set<java.lang.String> resources = null;
+public static String codeBase = null;
+
+public String getCodeBase(HttpServletRequest request) {
+	if (codeBase==null || codeBase.isEmpty()) {
+		String url = request.getRequestURL().toString();
+		String servletPath = request.getServletPath();
+		codeBase = url.substring(0,url.indexOf(servletPath));		
+	}
+	return codeBase;
+}
+
+public java.util.Set<java.lang.String> getResourcePaths() {
+	synchronized (this) {
+		if (resources==null || resources.isEmpty()) {
+			// This files shows the list of jar files required
+			// Sample output:
+			resources = getServletContext().getResourcePaths("/" + jnlpResourcePath);			
+		}
+	}
+	return resources;
+}
+%>
+<%
+String codebase = getCodeBase(request);
+java.util.Set<java.lang.String> resourcePaths = getResourcePaths();
+%>
+<jnlp spec="6.0+" codebase="<%=codebase %>" >
+	<information>
+		<title>ATP Framwoek Web</title>
+		<vendor>Weboctave</vendor>
+		<description>Simple Swing Webstart Application </description>
+		<description kind="short">Simple Swing Webstart Application</description>
+		<shortcut online="true"><desktop/><menu submenu="Weboctave"/></shortcut>
+	</information>
+	<security>
+		<all-permissions/>
+	</security>
+	<update check="always" policy="always" />
+	<resources>
+		<j2se version="1.6+" href='http://java.sun.com/products/autodl/j2se' java-vm-args="-Xmx128m"/>
+		$dependencies
+<%
+// JSP out flush is required here before the request dispatcher include,
+// otherwise, the output from the include would come before the output from this jsp
+out.flush();
+// include jsp from another webapp in the same server
+javax.servlet.ServletContext context = application.getContext(childapp);
+if (context!=null) {
+   javax.servlet.RequestDispatcher rd = context.getRequestDispatcher("/webstart/resourceversion.jsp");
+   if (rd!=null)
+   		rd.include(request, response);
+}
+%>
+	</resources>
+	<application-desc main-class="com.weboctave.multiwebstart.base.client.HelloWorldSwing"/>
+	</application-desc>
+</jnlp>

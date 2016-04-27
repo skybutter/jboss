@@ -1,0 +1,139 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <modelVersion>4.0.0</modelVersion>
+
+   <parent>
+      <artifactId>module-fmk</artifactId>
+      <groupId>sb.mvn.module-fmk</groupId>
+      <version>6.7.3-SNAPSHOT</version>
+   </parent>
+   <artifactId>web</artifactId>
+   <packaging>war</packaging>
+   <name>web</name>
+
+   <dependencies>
+      <!-- Dependency on the EJB module so we can use it's services if needed -->
+      <dependency>
+         <groupId>sb.mvn.module-fmk</groupId>
+         <artifactId>server</artifactId>
+         <version>${project.version}</version>
+         <scope>provided</scope>
+      </dependency>
+
+      <dependency>
+         <groupId>org.glassfish.external</groupId>
+         <artifactId>opendmk_jdmkrt_jar</artifactId>
+         <version>1.0-b01-ea</version>
+      </dependency>
+      <!-- <dependency> <groupId>org.jboss.spec.javax.servlet</groupId> 
+         <artifactId>jboss-servlet-api_3.0_spec</artifactId> <scope>provided</scope> 
+         </dependency> -->
+
+      <dependency>
+         <groupId>javax.servlet</groupId>
+         <artifactId>javax.servlet-api</artifactId>
+         <version>3.0.1</version>
+         <scope>provided</scope>
+      </dependency>
+
+      <!-- <dependency> <groupId>org.jboss.as</groupId> <artifactId>jboss-as-system-jmx</artifactId> 
+         <scope>provided</scope> </dependency> -->
+   </dependencies>
+
+   <build>
+      <finalName>${project.artifactId}</finalName>
+      <plugins>
+
+         <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <executions>
+               <execution>
+                  <phase>process-resources</phase>
+                  <goals>
+                     <goal>unpack</goal>
+                  </goals>
+               </execution>
+            </executions>
+            <configuration>
+               <artifactItems>
+                  <artifactItem>
+                     <groupId>sb.mvn.module-fmk</groupId>
+                     <artifactId>client</artifactId>
+                     <version>${project.version}</version>
+                     <type>zip</type>
+                  </artifactItem>
+               </artifactItems>
+               <outputDirectory>${project.build.directory}/${project.build.finalName}</outputDirectory>
+            </configuration>
+         </plugin>
+         <plugin>
+            <artifactId>maven-resources-plugin</artifactId>
+            <executions>
+               <execution>
+                  <id>copy-resources</id>
+                  <phase>prepare-package</phase>
+                  <goals>
+                     <goal>copy-resources</goal>
+                  </goals>
+                  <configuration>
+                     <outputDirectory>${project.build.directory}/${project.build.finalName}/universal</outputDirectory>
+                     <resources>
+                        <resource>
+                           <directory>${basedir}/src/main/version</directory>
+                           <filtering>true</filtering>
+                        </resource>
+                     </resources>
+                  </configuration>
+               </execution>
+            </executions>
+         </plugin>
+         <plugin>
+            <groupId>com.google.code.maven-replacer-plugin</groupId>
+            <artifactId>replacer</artifactId>
+            <version>1.5.3</version>
+            <executions>
+               <execution>
+                  <phase>prepare-package</phase>
+                  <goals>
+                     <goal>replace</goal>
+                  </goals>
+               </execution>
+            </executions>
+            <configuration>
+               <basedir>${project.build.directory}/${project.build.finalName}/universal</basedir>
+               <filesToInclude>version.*</filesToInclude>
+               <replacements>
+                  <replacement>
+                     <token>@project.version@</token>
+                     <value>${project.version}</value>
+                  </replacement>
+                  <replacement>
+                     <token>@artifactid@</token>
+                     <value>${project.parent.artifactId}</value>
+                  </replacement>
+               </replacements>
+            </configuration>
+         </plugin>
+         <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <executions>
+               <execution>
+                  <id>attach-sources</id>
+                  <goals>
+                     <goal>jar-no-fork</goal>
+                  </goals>
+               </execution>
+            </executions>
+         </plugin>
+      </plugins>
+   </build>
+   <distributionManagement>
+      <site>
+         <id>SB-site</id>
+         <name>SB Maven Site</name>
+         <url>${sb.mavenSite.url}/${project.parent.artifactId}/${project.version}/${project.artifactId}</url>
+      </site>
+   </distributionManagement>
+</project>
